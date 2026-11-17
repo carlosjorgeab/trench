@@ -7,7 +7,9 @@ import { FileText, Plus, Edit, Trash2, Search } from 'lucide-react'
 
 interface Item {
   id: number
-    nome: string
+  nome: string
+  tipo: string
+  plano_conta_id: number | null
   ativo: boolean
   created_at: string
 }
@@ -19,6 +21,8 @@ export default function CategoriasPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formData, setFormData] = useState({
       nome: '',
+      tipo: 'debito',
+      plano_conta_id: null as number | null,
       ativo: true,
     })
 
@@ -57,6 +61,8 @@ export default function CategoriasPage() {
         setEditingId(null)
         setFormData({
       nome: '',
+      tipo: 'debito',
+      plano_conta_id: null,
       ativo: true,
     })
         fetchItems()
@@ -70,6 +76,8 @@ export default function CategoriasPage() {
     setEditingId(item.id)
     setFormData({
       nome: item.nome || '',
+      tipo: item.tipo || 'debito',
+      plano_conta_id: item.plano_conta_id || null,
       ativo: item.ativo !== false,
     })
     setOpenDialog(true)
@@ -87,9 +95,10 @@ export default function CategoriasPage() {
   }
 
   return (
+    <>
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
-      <Box sx={{ ml: { lg: '288px' }} }}>
+      <Box sx={{ ml: { lg: '288px' } }}>
         <Box
           component="header"
           sx={{
@@ -115,14 +124,16 @@ export default function CategoriasPage() {
               Categorias do plano de contas
             </Typography>
           </Box>
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={{() => {
+          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => {
             setEditingId(null)
             setFormData({
       nome: '',
+      tipo: 'debito',
+      plano_conta_id: null,
       ativo: true,
     })
             setOpenDialog(true)
-          }>
+          }}>
             Novo Categoria
           </Button>
         </Box>
@@ -138,9 +149,9 @@ export default function CategoriasPage() {
                   size="small"
                   placeholder="Buscar..."
                   InputProps={{
-                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' } />,
-                  }
-                  sx={{ width: 250 }}}
+                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
+                  }}
+                  sx={{ width: 250 }}
                 />
               </Box>
               <TableContainer component={Paper} elevation={0}>
@@ -155,7 +166,7 @@ export default function CategoriasPage() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan=3 align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">
                             {loading ? 'Carregando...' : 'Nenhum registro cadastrado. Clique em "Novo" para criar.'}
                           </Typography>
@@ -173,10 +184,10 @@ export default function CategoriasPage() {
                             />
                           </TableCell>
                           <TableCell align="right">
-                            <IconButton size="small" onClick={{() => handleEdit(item)}>
+                            <IconButton size="small" onClick={() => handleEdit(item)}>
                               <Edit size={16} />
                             </IconButton>
-                            <IconButton size="small" color="error" onClick={{() => handleDelete(item.id)}>
+                            <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}>
                               <Trash2 size={16} />
                             </IconButton>
                           </TableCell>
@@ -200,14 +211,14 @@ export default function CategoriasPage() {
               size="small"
               label="Nome"
               value={formData.nome}
-              onChange={{(e) => setFormData({ ...formData, nome: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
               required
             />
             <FormControlLabel
               control={
                 <Switch
                   checked={formData.ativo}
-                  onChange={{(e) => setFormData({ ...formData, ativo: e.target.checked })}
+                  onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                 />
               }
               label="Ativo"
@@ -215,15 +226,18 @@ export default function CategoriasPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={{() => { setOpenDialog(false); setEditingId(null); setFormData({
+          <Button onClick={() => { setOpenDialog(false); setEditingId(null); setFormData({
       nome: '',
+      tipo: 'debito',
+      plano_conta_id: null,
       ativo: true,
-    }); }>Cancelar</Button>
-          <Button variant="contained" onClick={{handleCreate}>
+    }); }} >Cancelar</Button>
+          <Button variant="contained" onClick={handleCreate}>
             {editingId ? 'Atualizar' : 'Salvar'}
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
+    </>
   )
 }

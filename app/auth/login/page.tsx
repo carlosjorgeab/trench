@@ -85,7 +85,7 @@ export default function LoginPage() {
         <div className="mt-4">
           <Button
             type="button"
-            variant="outline"
+            variant="outlined"
             className="w-full"
             onClick={handleGoogleLogin}
           >

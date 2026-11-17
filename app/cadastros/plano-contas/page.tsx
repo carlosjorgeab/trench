@@ -7,7 +7,11 @@ import { FileText, Plus, Edit, Trash2, Search } from 'lucide-react'
 
 interface Item {
   id: number
-    tipo: string
+  parent_id: number | null
+  nivel: number
+  codigo: string
+  nome: string
+  tipo: string
   ativo: boolean
   created_at: string
 }
@@ -18,6 +22,10 @@ export default function PlanodeContasPage() {
   const [openDialog, setOpenDialog] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formData, setFormData] = useState({
+      parent_id: null as number | null,
+      nivel: 1,
+      codigo: '',
+      nome: '',
       tipo: '',
       ativo: true,
     })
@@ -42,6 +50,10 @@ export default function PlanodeContasPage() {
   }, [])
 
   const handleCreate = async () => {
+    if (!/^[a-zA-Z0-9]{10,}$/.test(formData.codigo)) {
+      alert('Código deve ter pelo menos 10 caracteres alfanuméricos')
+      return
+    }
     try {
       const method = editingId ? 'PUT' : 'POST'
       const body = editingId ? { id: editingId, ...formData } : formData
@@ -56,6 +68,10 @@ export default function PlanodeContasPage() {
         setOpenDialog(false)
         setEditingId(null)
         setFormData({
+      parent_id: null,
+      nivel: 1,
+      codigo: '',
+      nome: '',
       tipo: '',
       ativo: true,
     })
@@ -69,6 +85,10 @@ export default function PlanodeContasPage() {
   const handleEdit = (item: Item) => {
     setEditingId(item.id)
     setFormData({
+      parent_id: item.parent_id || null,
+      nivel: item.nivel || 1,
+      codigo: item.codigo || '',
+      nome: item.nome || '',
       tipo: item.tipo || '',
       ativo: item.ativo !== false,
     })
@@ -87,9 +107,10 @@ export default function PlanodeContasPage() {
   }
 
   return (
+    <>
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
-      <Box sx={{ ml: { lg: '288px' }} }}>
+      <Box sx={{ ml: { lg: '288px' } }}>
         <Box
           component="header"
           sx={{
@@ -115,14 +136,18 @@ export default function PlanodeContasPage() {
               Plano de contas contábeis
             </Typography>
           </Box>
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={{() => {
+          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => {
             setEditingId(null)
             setFormData({
+      parent_id: null,
+      nivel: 1,
+      codigo: '',
+      nome: '',
       tipo: '',
       ativo: true,
     })
             setOpenDialog(true)
-          }>
+          }}>
             Novo Plano de Conta
           </Button>
         </Box>
@@ -138,9 +163,9 @@ export default function PlanodeContasPage() {
                   size="small"
                   placeholder="Buscar..."
                   InputProps={{
-                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' } />,
-                  }
-                  sx={{ width: 250 }}}
+                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
+                  }}
+                  sx={{ width: 250 }}
                 />
               </Box>
               <TableContainer component={Paper} elevation={0}>
@@ -155,7 +180,7 @@ export default function PlanodeContasPage() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan=3 align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">
                             {loading ? 'Carregando...' : 'Nenhum registro cadastrado. Clique em "Novo" para criar.'}
                           </Typography>
@@ -173,10 +198,10 @@ export default function PlanodeContasPage() {
                             />
                           </TableCell>
                           <TableCell align="right">
-                            <IconButton size="small" onClick={{() => handleEdit(item)}>
+                            <IconButton size="small" onClick={() => handleEdit(item)}>
                               <Edit size={16} />
                             </IconButton>
-                            <IconButton size="small" color="error" onClick={{() => handleDelete(item.id)}>
+                            <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}>
                               <Trash2 size={16} />
                             </IconButton>
                           </TableCell>
@@ -200,7 +225,7 @@ export default function PlanodeContasPage() {
               <Select
                 value={formData.tipo}
                 label="Tipo"
-                onChange={{(e) => setFormData({ ...formData, tipo: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
               >
                 <MenuItem value="ativo">Ativo</MenuItem>
                 <MenuItem value="passivo">Passivo</MenuItem>
@@ -213,7 +238,7 @@ export default function PlanodeContasPage() {
               control={
                 <Switch
                   checked={formData.ativo}
-                  onChange={{(e) => setFormData({ ...formData, ativo: e.target.checked })}
+                  onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                 />
               }
               label="Ativo"
@@ -221,15 +246,20 @@ export default function PlanodeContasPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={{() => { setOpenDialog(false); setEditingId(null); setFormData({
+          <Button onClick={() => { setOpenDialog(false); setEditingId(null); setFormData({
+      parent_id: null,
+      nivel: 1,
+      codigo: '',
+      nome: '',
       tipo: '',
       ativo: true,
-    }); }>Cancelar</Button>
-          <Button variant="contained" onClick={{handleCreate}>
+    }); }} >Cancelar</Button>
+          <Button variant="contained" onClick={handleCreate}>
             {editingId ? 'Atualizar' : 'Salvar'}
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
+    </>
   )
 }

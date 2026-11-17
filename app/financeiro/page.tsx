@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../components/sidebar'
 import { Box, Grid, Card, CardContent, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Autocomplete } from '@mui/material'
-import { DollarSign, Search, Filter, Plus, Download, Close, AttachFile } from 'lucide-react'
+import { DollarSign, Search, Filter, Plus, Download, X, Paperclip } from 'lucide-react'
 import FileUpload from '../components/FileUpload'
 
 interface Lancamento {

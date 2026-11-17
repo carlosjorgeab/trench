@@ -90,6 +90,7 @@ export default function EmpresasPage() {
   }
 
   return (
+    <>
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
       <Box sx={{ ml: { lg: '288px' } }}>
@@ -241,5 +242,6 @@ export default function EmpresasPage() {
         </DialogActions>
       </Dialog>
     </Box>
+    </>
   )
 }

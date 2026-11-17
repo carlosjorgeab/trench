@@ -95,9 +95,10 @@ export default function FornecedoresPage() {
   }
 
   return (
+    <>
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
-      <Box sx={{ ml: { lg: '288px' }} }}>
+      <Box sx={{ ml: { lg: '288px' } }}>
         <Box
           component="header"
           sx={{
@@ -123,7 +124,7 @@ export default function FornecedoresPage() {
               Cadastro de fornecedores
             </Typography>
           </Box>
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={{() => {
+          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => {
             setEditingId(null)
             setFormData({
       nome: '',
@@ -132,7 +133,7 @@ export default function FornecedoresPage() {
       ativo: true,
     })
             setOpenDialog(true)
-          }>
+          }}>
             Novo Fornecedore
           </Button>
         </Box>
@@ -148,9 +149,9 @@ export default function FornecedoresPage() {
                   size="small"
                   placeholder="Buscar..."
                   InputProps={{
-                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' } />,
-                  }
-                  sx={{ width: 250 }}}
+                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
+                  }}
+                  sx={{ width: 250 }}
                 />
               </Box>
               <TableContainer component={Paper} elevation={0}>
@@ -167,7 +168,7 @@ export default function FornecedoresPage() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan=5 align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">
                             {loading ? 'Carregando...' : 'Nenhum registro cadastrado. Clique em "Novo" para criar.'}
                           </Typography>
@@ -187,10 +188,10 @@ export default function FornecedoresPage() {
                             />
                           </TableCell>
                           <TableCell align="right">
-                            <IconButton size="small" onClick={{() => handleEdit(item)}>
+                            <IconButton size="small" onClick={() => handleEdit(item)}>
                               <Edit size={16} />
                             </IconButton>
-                            <IconButton size="small" color="error" onClick={{() => handleDelete(item.id)}>
+                            <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}>
                               <Trash2 size={16} />
                             </IconButton>
                           </TableCell>
@@ -214,7 +215,7 @@ export default function FornecedoresPage() {
               size="small"
               label="Nome"
               value={formData.nome}
-              onChange={{(e) => setFormData({ ...formData, nome: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
               required
             />
             <TextField
@@ -222,7 +223,7 @@ export default function FornecedoresPage() {
               size="small"
               label="CNPJ"
               value={formData.cnpj}
-              onChange={{(e) => setFormData({ ...formData, cnpj: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
             />
             <TextField
               fullWidth
@@ -230,13 +231,13 @@ export default function FornecedoresPage() {
               label="Email"
               type="email"
               value={formData.email}
-              onChange={{(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
             <FormControlLabel
               control={
                 <Switch
                   checked={formData.ativo}
-                  onChange={{(e) => setFormData({ ...formData, ativo: e.target.checked })}
+                  onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                 />
               }
               label="Ativo"
@@ -244,17 +245,18 @@ export default function FornecedoresPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={{() => { setOpenDialog(false); setEditingId(null); setFormData({
+          <Button onClick={() => { setOpenDialog(false); setEditingId(null); setFormData({
       nome: '',
       cnpj: '',
       email: '',
       ativo: true,
-    }); }>Cancelar</Button>
-          <Button variant="contained" onClick={{handleCreate}>
+    }); }} >Cancelar</Button>
+          <Button variant="contained" onClick={handleCreate}>
             {editingId ? 'Atualizar' : 'Salvar'}
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
+    </>
   )
 }

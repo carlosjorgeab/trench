@@ -68,7 +68,8 @@ CREATE TABLE IF NOT EXISTS categorias (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas(id),
     nome VARCHAR(255) NOT NULL,
-    plano_conta_id INTEGER,
+    tipo VARCHAR(20) CHECK (tipo IN ('debito', 'credito')),
+    plano_conta_id INTEGER REFERENCES plano_contas(id),
     ativo BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -95,6 +96,10 @@ CREATE TABLE IF NOT EXISTS centros_custos (
 CREATE TABLE IF NOT EXISTS plano_contas (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas(id),
+    parent_id INTEGER REFERENCES plano_contas(id),
+    nivel INTEGER NOT NULL DEFAULT 1,
+    codigo VARCHAR(50) NOT NULL,
+    nome VARCHAR(255) NOT NULL,
     tipo VARCHAR(50),
     ativo BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT NOW()

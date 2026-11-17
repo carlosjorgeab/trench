@@ -23,7 +23,7 @@ export default function AcessoPage() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
-      <Box sx={{ ml: { lg: '288px' }} }}>
+      <Box sx={{ ml: { lg: '288px' } }}>
         <Box
           component="header"
           sx={{

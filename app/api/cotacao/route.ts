@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       currency: getCurrencyName(currency),
       code: currency,
       rate: data.rates[currency] || 0,
-      lastUpdated: new Date(data.time_last_updated * 1000).toLocaleString('pt-BR'),
+      lastUpdated: new Date(Number(data.time_last_updated) * 1000).toLocaleString('pt-BR'),
     }))
 
     return NextResponse.json({ success: true, quotes })

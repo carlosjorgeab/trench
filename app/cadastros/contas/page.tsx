@@ -91,9 +91,10 @@ export default function ContasPage() {
   }
 
   return (
+    <>
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
-      <Box sx={{ ml: { lg: '288px' }} }}>
+      <Box sx={{ ml: { lg: '288px' } }}>
         <Box
           component="header"
           sx={{
@@ -119,7 +120,7 @@ export default function ContasPage() {
               Contas bancárias e cartões
             </Typography>
           </Box>
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={{() => {
+          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => {
             setEditingId(null)
             setFormData({
       nome: '',
@@ -127,7 +128,7 @@ export default function ContasPage() {
       ativo: true,
     })
             setOpenDialog(true)
-          }>
+          }}>
             Novo Conta
           </Button>
         </Box>
@@ -143,9 +144,9 @@ export default function ContasPage() {
                   size="small"
                   placeholder="Buscar..."
                   InputProps={{
-                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' } />,
-                  }
-                  sx={{ width: 250 }}}
+                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
+                  }}
+                  sx={{ width: 250 }}
                 />
               </Box>
               <TableContainer component={Paper} elevation={0}>
@@ -161,7 +162,7 @@ export default function ContasPage() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan=4 align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">
                             {loading ? 'Carregando...' : 'Nenhum registro cadastrado. Clique em "Novo" para criar.'}
                           </Typography>
@@ -180,10 +181,10 @@ export default function ContasPage() {
                             />
                           </TableCell>
                           <TableCell align="right">
-                            <IconButton size="small" onClick={{() => handleEdit(item)}>
+                            <IconButton size="small" onClick={() => handleEdit(item)}>
                               <Edit size={16} />
                             </IconButton>
-                            <IconButton size="small" color="error" onClick={{() => handleDelete(item.id)}>
+                            <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}>
                               <Trash2 size={16} />
                             </IconButton>
                           </TableCell>
@@ -207,7 +208,7 @@ export default function ContasPage() {
               size="small"
               label="Nome"
               value={formData.nome}
-              onChange={{(e) => setFormData({ ...formData, nome: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
               required
             />
             <FormControl fullWidth size="small">
@@ -215,7 +216,7 @@ export default function ContasPage() {
               <Select
                 value={formData.tipo}
                 label="Tipo"
-                onChange={{(e) => setFormData({ ...formData, tipo: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
               >
                 <MenuItem value="banco">Banco</MenuItem>
                 <MenuItem value="cartao">Cartão de Crédito</MenuItem>
@@ -227,7 +228,7 @@ export default function ContasPage() {
               control={
                 <Switch
                   checked={formData.ativo}
-                  onChange={{(e) => setFormData({ ...formData, ativo: e.target.checked })}
+                  onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                 />
               }
               label="Ativo"
@@ -235,16 +236,17 @@ export default function ContasPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={{() => { setOpenDialog(false); setEditingId(null); setFormData({
+          <Button onClick={() => { setOpenDialog(false); setEditingId(null); setFormData({
       nome: '',
       tipo: '',
       ativo: true,
-    }); }>Cancelar</Button>
-          <Button variant="contained" onClick={{handleCreate}>
+    }); }} >Cancelar</Button>
+          <Button variant="contained" onClick={handleCreate}>
             {editingId ? 'Atualizar' : 'Salvar'}
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
+    </>
   )
 }

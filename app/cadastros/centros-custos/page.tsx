@@ -87,9 +87,10 @@ export default function CentrosdeCustoPage() {
   }
 
   return (
+    <>
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
-      <Box sx={{ ml: { lg: '288px' }} }}>
+      <Box sx={{ ml: { lg: '288px' } }}>
         <Box
           component="header"
           sx={{
@@ -115,14 +116,14 @@ export default function CentrosdeCustoPage() {
               Centros de custos
             </Typography>
           </Box>
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={{() => {
+          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => {
             setEditingId(null)
             setFormData({
       nome: '',
       ativo: true,
     })
             setOpenDialog(true)
-          }>
+          }}>
             Novo Centros de Custo
           </Button>
         </Box>
@@ -138,9 +139,9 @@ export default function CentrosdeCustoPage() {
                   size="small"
                   placeholder="Buscar..."
                   InputProps={{
-                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' } />,
-                  }
-                  sx={{ width: 250 }}}
+                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
+                  }}
+                  sx={{ width: 250 }}
                 />
               </Box>
               <TableContainer component={Paper} elevation={0}>
@@ -155,7 +156,7 @@ export default function CentrosdeCustoPage() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan=3 align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">
                             {loading ? 'Carregando...' : 'Nenhum registro cadastrado. Clique em "Novo" para criar.'}
                           </Typography>
@@ -173,10 +174,10 @@ export default function CentrosdeCustoPage() {
                             />
                           </TableCell>
                           <TableCell align="right">
-                            <IconButton size="small" onClick={{() => handleEdit(item)}>
+                            <IconButton size="small" onClick={() => handleEdit(item)}>
                               <Edit size={16} />
                             </IconButton>
-                            <IconButton size="small" color="error" onClick={{() => handleDelete(item.id)}>
+                            <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}>
                               <Trash2 size={16} />
                             </IconButton>
                           </TableCell>
@@ -200,14 +201,14 @@ export default function CentrosdeCustoPage() {
               size="small"
               label="Nome"
               value={formData.nome}
-              onChange={{(e) => setFormData({ ...formData, nome: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
               required
             />
             <FormControlLabel
               control={
                 <Switch
                   checked={formData.ativo}
-                  onChange={{(e) => setFormData({ ...formData, ativo: e.target.checked })}
+                  onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                 />
               }
               label="Ativo"
@@ -215,15 +216,16 @@ export default function CentrosdeCustoPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={{() => { setOpenDialog(false); setEditingId(null); setFormData({
+          <Button onClick={() => { setOpenDialog(false); setEditingId(null); setFormData({
       nome: '',
       ativo: true,
-    }); }>Cancelar</Button>
-          <Button variant="contained" onClick={{handleCreate}>
+    }); }} >Cancelar</Button>
+          <Button variant="contained" onClick={handleCreate}>
             {editingId ? 'Atualizar' : 'Salvar'}
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
+    </>
   )
 }
