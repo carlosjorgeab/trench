@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Sidebar } from '../../components/sidebar'
+import { AppShell } from '../../components/AppShell'
 import { Box, Grid, Card, CardContent, Typography, Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Switch, FormControlLabel } from '@mui/material'
 import { Building2, Plus, Edit, Trash2, Search } from 'lucide-react'
 
@@ -90,62 +90,42 @@ export default function EmpresasPage() {
   }
 
   return (
-    <>
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Sidebar />
-      <Box sx={{ ml: { xs: 0, md: '280px' } }}>
-        <Box
-          component="header"
-          sx={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 1100,
-            bgcolor: 'background.paper',
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            px: 3,
-            py: 2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxShadow: 1,
-          }}
-        >
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 500 }}>
-              Empresas
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Cadastro de empresas do grupo
-            </Typography>
-          </Box>
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => {
+    <AppShell
+      title="Empresas do Grupo"
+      subtitle="Estrutura multi-empresa, filiais, matriz e participações societárias"
+      breadcrumbs={[{ label: 'Início', href: '/dashboard' }, { label: 'Cadastros', href: '/cadastros' }, { label: 'Empresas' }]}
+      actions={
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<Plus size={16} />}
+          onClick={() => {
             setEditingId(null)
             setFormData({ nome: '', cnpj: '', email: '', ativo: true })
             setOpenDialog(true)
-          }}>
-            Nova Empresa
-          </Button>
-        </Box>
-
-        <Box component="main" sx={{ p: 3 }}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                  Empresas Cadastradas
-                </Typography>
-                <TextField
-                  size="small"
-                  placeholder="Buscar..."
-                  InputProps={{
-                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
-                  }}
-                  sx={{ width: 250 }}
-                />
-              </Box>
-              <TableContainer component={Paper} elevation={0}>
-                <Table>
+          }}
+        >
+          Nova Empresa
+        </Button>
+      }
+    >
+      <Card elevation={0}>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Empresas Cadastradas
+            </Typography>
+            <TextField
+              size="small"
+              placeholder="Buscar empresa..."
+              InputProps={{
+                startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
+              }}
+              sx={{ width: { xs: '100%', sm: 260 } }}
+            />
+          </Box>
+          <TableContainer component={Paper} elevation={0} sx={{ overflowX: 'auto', width: '100%' }}>
+            <Table sx={{ minWidth: 560 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>Nome</TableCell>
@@ -193,8 +173,6 @@ export default function EmpresasPage() {
               </TableContainer>
             </CardContent>
           </Card>
-        </Box>
-      </Box>
 
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editingId ? 'Editar Empresa' : 'Nova Empresa'}</DialogTitle>
@@ -241,7 +219,6 @@ export default function EmpresasPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
-    </>
+    </AppShell>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Sidebar } from '../components/sidebar'
+import { AppShell } from '../components/AppShell'
 import { Box, Grid, Card, CardContent, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Autocomplete } from '@mui/material'
 import { DollarSign, Search, Filter, Plus, Download, X, Paperclip } from 'lucide-react'
 import FileUpload from '../components/FileUpload'
@@ -225,55 +225,42 @@ export default function FinanceiroPage() {
   })
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Sidebar />
-      <Box sx={{ ml: { xs: 0, md: '280px' } }}>
-        <Box
-          component="header"
-          sx={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 1100,
-            bgcolor: 'background.paper',
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            px: 3,
-            py: 2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxShadow: 1,
-          }}
-        >
-          <Typography variant="h5" sx={{ fontWeight: 500 }}>
-            Sistema Financeiro
-          </Typography>
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => {
+    <AppShell
+      title="Sistema Financeiro"
+      subtitle="Controle de lançamentos, receitas, despesas e conciliação"
+      breadcrumbs={[{ label: 'Início', href: '/dashboard' }, { label: 'Financeiro' }]}
+      actions={
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<Plus size={16} />}
+          onClick={() => {
             setEditingId(null)
             resetForm()
             setOpenDialog(true)
-          }}>
-            Novo Lançamento
-          </Button>
-        </Box>
-
-        <Box component="main" sx={{ p: 3 }}>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {stats.map((stat) => (
-              <Grid item xs={6} sm={3} key={stat.label}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 500 }}>
-                      {stat.label}
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 500, mt: 1, color: stat.color + '.main' }}>
-                      {stat.value}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+          }}
+        >
+          Novo Lançamento
+        </Button>
+      }
+    >
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Grid container spacing={2}>
+          {stats.map((stat) => (
+            <Grid item xs={12} sm={6} md={3} key={stat.label}>
+              <Card>
+                <CardContent>
+                  <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 500 }}>
+                    {stat.label}
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 500, mt: 1, color: stat.color + '.main' }}>
+                    {stat.value}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
 
           <Card sx={{ mb: 3 }}>
             <CardContent>
@@ -336,8 +323,8 @@ export default function FinanceiroPage() {
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
                 Lançamentos
               </Typography>
-              <TableContainer component={Paper} elevation={0}>
-                <Table>
+              <TableContainer component={Paper} elevation={0} sx={{ overflowX: 'auto', width: '100%' }}>
+                <Table sx={{ minWidth: 800 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>Data</TableCell>
@@ -406,7 +393,6 @@ export default function FinanceiroPage() {
             </CardContent>
           </Card>
         </Box>
-      </Box>
 
       {/* Dialog for new/edit lancamento */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
@@ -626,6 +612,6 @@ export default function FinanceiroPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </AppShell>
   )
 }

@@ -168,7 +168,7 @@ export function AppHeader({
         </Tooltip>
 
         {/* Ações Específicas da Página */}
-        {actions && <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>{actions}</Box>}
+        {actions && <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>{actions}</Box>}
       </Box>
     </Box>
   )

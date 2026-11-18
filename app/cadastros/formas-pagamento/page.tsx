@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Sidebar } from '../../components/sidebar'
+import { AppShell } from '../../components/AppShell'
 import { Box, Grid, Card, CardContent, Typography, Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Switch, FormControlLabel, FormControl, InputLabel, Select, MenuItem } from '@mui/material'
 import { DollarSign, Plus, Edit, Trash2, Search } from 'lucide-react'
 
 interface Item {
   id: number
-    nome: string
+  nome: string
   ativo: boolean
   created_at: string
 }
@@ -18,9 +18,9 @@ export default function FormasdePagamentoPage() {
   const [openDialog, setOpenDialog] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formData, setFormData] = useState({
-      nome: '',
-      ativo: true,
-    })
+    nome: '',
+    ativo: true,
+  })
 
   const fetchItems = async () => {
     setLoading(true)
@@ -45,7 +45,7 @@ export default function FormasdePagamentoPage() {
     try {
       const method = editingId ? 'PUT' : 'POST'
       const body = editingId ? { id: editingId, ...formData } : formData
-      
+
       const res = await fetch('/api/formas-pagamento', {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -56,9 +56,9 @@ export default function FormasdePagamentoPage() {
         setOpenDialog(false)
         setEditingId(null)
         setFormData({
-      nome: '',
-      ativo: true,
-    })
+          nome: '',
+          ativo: true,
+        })
         fetchItems()
       }
     } catch (error) {
@@ -87,110 +87,88 @@ export default function FormasdePagamentoPage() {
   }
 
   return (
-    <>
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Sidebar />
-      <Box sx={{ ml: { xs: 0, md: '280px' } }}>
-        <Box
-          component="header"
-          sx={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 1100,
-            bgcolor: 'background.paper',
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            px: 3,
-            py: 2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxShadow: 1,
-          }}
-        >
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 500 }}>
-              Formas de Pagamento
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Formas de pagamento
-            </Typography>
-          </Box>
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => {
+    <AppShell
+      title="Formas de Pagamento"
+      subtitle="PIX, Boletos bancários, TED, Cartão de Crédito e transferências"
+      breadcrumbs={[{ label: 'Início', href: '/dashboard' }, { label: 'Cadastros', href: '/cadastros' }, { label: 'Formas de Pagamento' }]}
+      actions={
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<Plus size={16} />}
+          onClick={() => {
             setEditingId(null)
             setFormData({
-      nome: '',
-      ativo: true,
-    })
+              nome: '',
+              ativo: true,
+            })
             setOpenDialog(true)
-          }}>
-            Novo Formas de Pagamento
-          </Button>
-        </Box>
-
-        <Box component="main" sx={{ p: 3 }}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                  Formas de Pagamento Cadastrados
-                </Typography>
-                <TextField
-                  size="small"
-                  placeholder="Buscar..."
-                  InputProps={{
-                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
-                  }}
-                  sx={{ width: 250 }}
-                />
-              </Box>
-              <TableContainer component={Paper} elevation={0}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Nome</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell align="right">Ações</TableCell>
+          }}
+        >
+          Nova Forma de Pagamento
+        </Button>
+      }
+    >
+      <Card elevation={0}>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Formas de Pagamento Cadastradas
+            </Typography>
+            <TextField
+              size="small"
+              placeholder="Buscar forma de pagamento..."
+              InputProps={{
+                startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
+              }}
+              sx={{ width: { xs: '100%', sm: 260 } }}
+            />
+          </Box>
+          <TableContainer component={Paper} elevation={0} sx={{ overflowX: 'auto', width: '100%' }}>
+            <Table sx={{ minWidth: 500 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Nome</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell align="right">Ações</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
+                      <Typography color="text.secondary">
+                        {loading ? 'Carregando...' : 'Nenhum registro cadastrado. Clique em "Novo" para criar.'}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell sx={{ fontWeight: 500 }}>{item.nome}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={item.ativo !== false ? 'Ativo' : 'Inativo'}
+                          size="small"
+                          color={item.ativo !== false ? 'success' : 'default'}
+                        />
+                      </TableCell>
+                      <TableCell align="right">
+                        <IconButton size="small" onClick={() => handleEdit(item)}>
+                          <Edit size={16} />
+                        </IconButton>
+                        <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}>
+                          <Trash2 size={16} />
+                        </IconButton>
+                      </TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {items.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
-                          <Typography color="text.secondary">
-                            {loading ? 'Carregando...' : 'Nenhum registro cadastrado. Clique em "Novo" para criar.'}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      items.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell sx={{ fontWeight: 500 }}>{item.nome}</TableCell>
-                          <TableCell>
-                            <Chip
-                              label={item.ativo !== false ? 'Ativo' : 'Inativo'}
-                              size="small"
-                              color={item.ativo !== false ? 'success' : 'default'}
-                            />
-                          </TableCell>
-                          <TableCell align="right">
-                            <IconButton size="small" onClick={() => handleEdit(item)}>
-                              <Edit size={16} />
-                            </IconButton>
-                            <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}>
-                              <Trash2 size={16} />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </CardContent>
-          </Card>
-        </Box>
-      </Box>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
 
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editingId ? 'Editar' : 'Novo'} Formas de Pagamento</DialogTitle>
@@ -216,16 +194,17 @@ export default function FormasdePagamentoPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setOpenDialog(false); setEditingId(null); setFormData({
-      nome: '',
-      ativo: true,
-    }); }} >Cancelar</Button>
+          <Button onClick={() => {
+            setOpenDialog(false); setEditingId(null); setFormData({
+              nome: '',
+              ativo: true,
+            });
+          }} >Cancelar</Button>
           <Button variant="contained" onClick={handleCreate}>
             {editingId ? 'Atualizar' : 'Salvar'}
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
-    </>
+    </AppShell>
   )
 }

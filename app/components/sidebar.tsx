@@ -563,28 +563,30 @@ export function Sidebar({ mobileOpen: externalMobileOpen, onMobileClose }: Sideb
 
   return (
     <>
-      {/* Botão de Menu Flutuante para Dispositivos Móveis (xs / sm) */}
-      <IconButton
-        onClick={() => setInternalMobileOpen(true)}
-        aria-label="Abrir menu de navegação"
-        sx={{
-          position: 'fixed',
-          top: 14,
-          left: 14,
-          zIndex: 1250,
-          display: { xs: 'flex', md: 'none' },
-          bgcolor: 'background.paper',
-          color: 'text.primary',
-          boxShadow: 3,
-          border: '1px solid',
-          borderColor: 'divider',
-          '&:hover': {
+      {/* Botão de Menu Flutuante para Dispositivos Móveis quando usado fora do AppShell */}
+      {externalMobileOpen === undefined && (
+        <IconButton
+          onClick={() => setInternalMobileOpen(true)}
+          aria-label="Abrir menu de navegação"
+          sx={{
+            position: 'fixed',
+            top: 14,
+            left: 14,
+            zIndex: 1250,
+            display: { xs: 'flex', md: 'none' },
             bgcolor: 'background.paper',
-          },
-        }}
-      >
-        <Menu size={20} />
-      </IconButton>
+            color: 'text.primary',
+            boxShadow: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            '&:hover': {
+              bgcolor: 'background.paper',
+            },
+          }}
+        >
+          <Menu size={20} />
+        </IconButton>
+      )}
 
       {/* Drawer Móvel / Temporário (< md) */}
       <Drawer
