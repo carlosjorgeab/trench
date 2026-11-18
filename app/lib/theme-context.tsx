@@ -1,10 +1,12 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react'
+import { createContext, useContext, ReactNode } from 'react'
+import { useThemeConfig } from './theme-config-context'
 
 interface ThemeContextType {
   theme: 'light' | 'dark'
   setTheme: (theme: 'light' | 'dark') => void
+  toggleTheme: () => void
   colors: {
     primary: string
     secondary: string
@@ -16,49 +18,30 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | null>(null)
 
-const defaultColors = {
-  primary: '#3b82f6',
-  secondary: '#14b8a6',
-  background: '#ffffff',
-  text: '#1a1a1a',
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
-  const [colors, setColors] = useState(defaultColors)
+  const { config, setMode, toggleMode, updateConfig } = useThemeConfig()
 
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('trench-theme') as 'light' | 'dark' | null
-    const savedColors = localStorage.getItem('trench-colors')
-    
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.setAttribute('data-theme', savedTheme)
-    }
-    if (savedColors) {
-      setColors(JSON.parse(savedColors))
-    }
-  }, [])
-
-  const handleSetTheme = (newTheme: 'light' | 'dark') => {
-    setTheme(newTheme)
-    localStorage.setItem('trench-theme', newTheme)
-    document.documentElement.setAttribute('data-theme', newTheme)
+  const value: ThemeContextType = {
+    theme: config.mode,
+    setTheme: (mode: 'light' | 'dark') => setMode(mode),
+    toggleTheme: toggleMode,
+    colors: {
+      primary: config.primaryColor,
+      secondary: config.secondaryColor,
+      background: config.backgroundColor,
+      text: config.textColor,
+    },
+    setColors: (colors) => {
+      updateConfig({
+        primaryColor: colors.primary,
+        secondaryColor: colors.secondary,
+        backgroundColor: colors.background,
+        textColor: colors.text,
+      })
+    },
   }
 
-  const handleSetColors = (newColors: ThemeContextType['colors']) => {
-    setColors(newColors)
-    localStorage.setItem('trench-colors', JSON.stringify(newColors))
-    Object.entries(newColors).forEach(([key, value]) => {
-      document.documentElement.style.setProperty(`--accent-${key}`, value)
-    })
-  }
-
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme: handleSetTheme, colors, setColors: handleSetColors }}>
-      {children}
-    </ThemeContext.Provider>
-  )
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {

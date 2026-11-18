@@ -2,33 +2,14 @@
 
 import { ReactNode } from 'react'
 import { SupabaseProvider } from './lib/supabase-context'
-import { ThemeProvider } from './lib/theme-context'
 import { ThemeConfigProvider } from './lib/theme-config-context'
-import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material/styles'
-import CssBaseline from '@mui/material/CssBaseline'
+import { ThemeProvider } from './lib/theme-context'
+import { AppThemeProvider } from './lib/app-theme-provider'
 import './globals.css'
 
 interface RootLayoutProps {
   children: ReactNode
 }
-
-const muiTheme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: {
-      main: '#1a73e8',
-    },
-    secondary: {
-      main: '#00639b',
-    },
-  },
-  typography: {
-    fontFamily: 'Roboto, Helvetica, Arial, sans-serif',
-  },
-  shape: {
-    borderRadius: 12,
-  },
-})
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
@@ -36,23 +17,22 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>TRENCH - Sistema Financeiro</title>
-        <meta name="description" content="Sistema Financeiro e Prestação de Contas" />
+        <title>TRENCH - Sistema Financeiro e Gestão de Contas</title>
+        <meta name="description" content="Sistema Financeiro, Gestão Multi-Empresa e Prestação de Contas" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <MuiThemeProvider theme={muiTheme}>
-          <CssBaseline />
+        <ThemeConfigProvider>
           <ThemeProvider>
-            <ThemeConfigProvider>
+            <AppThemeProvider>
               <SupabaseProvider>
                 {children}
               </SupabaseProvider>
-            </ThemeConfigProvider>
+            </AppThemeProvider>
           </ThemeProvider>
-        </MuiThemeProvider>
+        </ThemeConfigProvider>
       </body>
     </html>
   )

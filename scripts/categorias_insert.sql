@@ -1,0 +1,72 @@
+-- Categorias associadas ao Plano de Contas
+-- Tabela: categorias
+-- Tipo: debito/credito conforme natureza da conta
+
+-- Limpar dados existentes (opcional, descomente se necessário)
+-- DELETE FROM categorias;
+
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Caixa', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.1.1.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Bancos Conta Movimento', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.1.1.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Clientes', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.1.2.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Perdas Estimadas com Créditos de Liquidação Duvidosa', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.1.2.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Mercadorias', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.1.3.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Produtos Acabados', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.1.3.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Insumos', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.1.3.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Títulos a Receber', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.1.4.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Impostos a Recuperar', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.1.4.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Outros Valores a Receber', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.1.4.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Contas a Receber LP', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.1.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Perdas Estimadas CLD LP', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.1.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Participações Societárias', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.2.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Outros Investimentos', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.2.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Terrenos', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.3.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Edificações', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.3.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Máquinas e Equipamentos', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.3.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Veículos', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.3.04' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Móveis e Utensílios', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.3.05' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Depreciação Acumulada', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.3.06' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Softwares', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.4.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Amortização Acumulada', 'debito', (SELECT id FROM plano_contas WHERE codigo = '1.3.4.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Fornecedores Nacionais', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.1.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Empréstimos Bancários', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.2.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Financiamentos CP', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.2.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'SIMPLES NACIONAL a Recolher', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.3.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'ICMS a Recolher', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.3.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'ISSQN a Recolher', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.3.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Salários a Pagar', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.4.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'FGTS a Recolher', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.4.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'INSS a Recolher', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.4.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Telefone a Pagar', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.5.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Energia a Pagar', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.5.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Aluguel a Pagar', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.5.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Provisão de Férias', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.6.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Provisão de 13º Salário', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.6.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Provisão Encargos Férias e 13º', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.1.6.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Financiamentos Banco A LP', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.2.1.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Empréstimos de Sócios', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.2.2.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Capital Subscrito', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.3.1.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Capital a Integralizar', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.3.1.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Reservas de Capital', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.3.2.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Reservas de Lucros', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.3.2.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Lucros Acumulados', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.3.3.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Prejuízos Acumulados', 'credito', (SELECT id FROM plano_contas WHERE codigo = '2.3.3.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Venda de Produtos', 'credito', (SELECT id FROM plano_contas WHERE codigo = '3.1.1.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Venda de Mercadorias', 'credito', (SELECT id FROM plano_contas WHERE codigo = '3.1.1.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Venda de Serviços', 'credito', (SELECT id FROM plano_contas WHERE codigo = '3.1.1.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Deduções de Tributos, Abatimentos e Devoluções', 'credito', (SELECT id FROM plano_contas WHERE codigo = '3.1.1.04' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Receitas de Aplicações Financeiras', 'credito', (SELECT id FROM plano_contas WHERE codigo = '3.1.2.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Juros Ativos', 'credito', (SELECT id FROM plano_contas WHERE codigo = '3.1.2.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Receitas de Venda de Imobilizado', 'credito', (SELECT id FROM plano_contas WHERE codigo = '3.1.3.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Receitas de Venda de Investimentos', 'credito', (SELECT id FROM plano_contas WHERE codigo = '3.1.3.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Outras Receitas Operacionais', 'credito', (SELECT id FROM plano_contas WHERE codigo = '3.1.3.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Custos dos Insumos', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.1.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Custos da Mão de Obra', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.1.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Outros Custos', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.1.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Despesas Administrativas', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.2.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Despesas com Vendas', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.2.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Outras Despesas Gerais', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.2.03' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Juros Passivos', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.3.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Outras Despesas Financeiras', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.3.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Despesas com Baixa de Imobilizado', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.4.01' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Despesas com Baixa de Investimentos', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.4.02' LIMIT 1), true);
+INSERT INTO categorias (empresa_id, nome, tipo, plano_conta_id, ativo) VALUES (1, 'Outras Despesas Operacionais', 'debito', (SELECT id FROM plano_contas WHERE codigo = '3.2.4.03' LIMIT 1), true);

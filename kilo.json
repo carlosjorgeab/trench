@@ -1,0 +1,31 @@
+{
+  "theme": "catppuccin",
+  "tui": {
+    "appearance": "light",
+    "theme_tokens": {
+      "primary": "#24200E",
+      "surface": "#F5E6D3",
+      "secondary": "#6C757D",
+      "accent": "#F87171",
+      "success": "#4682B4",
+      "warning": "#D97706",
+      "danger": "#DC3545",
+      "light": "#FFFFFF",
+      "dark": "#1A1A1A"
+    },
+    "spacing": {
+      "base": 8,
+      "grid": 16,
+      "container": 24,
+      "card": 24
+    },
+    "font": {
+      "size": 14,
+      "line_height": 1.5,
+      "weight": "normal"
+    },
+    "radius": 8,
+    "border_radius": 4,
+    "shadow": 2
+  }
+}

@@ -110,7 +110,7 @@ export default function PlanodeContasPage() {
     <>
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
-      <Box sx={{ ml: { lg: '288px' } }}>
+      <Box sx={{ ml: { xs: 0, md: '280px' } }}>
         <Box
           component="header"
           sx={{
@@ -172,6 +172,9 @@ export default function PlanodeContasPage() {
                 <Table>
                   <TableHead>
                     <TableRow>
+                      <TableCell>Código</TableCell>
+                      <TableCell>Nome</TableCell>
+                      <TableCell>Nível</TableCell>
                       <TableCell>Tipo</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell align="right">Ações</TableCell>
@@ -180,7 +183,7 @@ export default function PlanodeContasPage() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">
                             {loading ? 'Carregando...' : 'Nenhum registro cadastrado. Clique em "Novo" para criar.'}
                           </Typography>
@@ -189,6 +192,9 @@ export default function PlanodeContasPage() {
                     ) : (
                       items.map((item) => (
                         <TableRow key={item.id}>
+                          <TableCell>{item.codigo}</TableCell>
+                          <TableCell>{item.nome}</TableCell>
+                          <TableCell>{item.nivel}</TableCell>
                           <TableCell>{item.tipo || "-"}</TableCell>
                           <TableCell>
                             <Chip
@@ -220,6 +226,41 @@ export default function PlanodeContasPage() {
         <DialogTitle>{editingId ? 'Editar' : 'Novo'} Plano de Conta</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Código (min. 10 caracteres alfanuméricos)"
+              value={formData.codigo}
+              onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="Nome"
+              value={formData.nome}
+              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+            />
+            <FormControl fullWidth size="small">
+              <InputLabel>Conta Pai</InputLabel>
+              <Select
+                value={formData.parent_id ?? ''}
+                label="Conta Pai"
+                onChange={(e) => setFormData({ ...formData, parent_id: e.target.value ? Number(e.target.value) : null })}
+              >
+                <MenuItem value="">Nenhuma (nível 1)</MenuItem>
+                {items.map((it) => (
+                  <MenuItem key={it.id} value={it.id}>{it.codigo} - {it.nome}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              fullWidth
+              size="small"
+              label="Nível"
+              type="number"
+              value={formData.nivel}
+              onChange={(e) => setFormData({ ...formData, nivel: Number(e.target.value) || 1 })}
+            />
             <FormControl fullWidth size="small">
               <InputLabel>Tipo</InputLabel>
               <Select

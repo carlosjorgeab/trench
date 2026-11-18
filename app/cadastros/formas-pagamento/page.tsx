@@ -90,7 +90,7 @@ export default function FormasdePagamentoPage() {
     <>
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
-      <Box sx={{ ml: { lg: '288px' } }}>
+      <Box sx={{ ml: { xs: 0, md: '280px' } }}>
         <Box
           component="header"
           sx={{

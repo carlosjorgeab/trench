@@ -16,6 +16,7 @@ interface Item {
 
 export default function CategoriasPage() {
   const [items, setItems] = useState<Item[]>([])
+  const [planoContas, setPlanoContas] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [openDialog, setOpenDialog] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -43,7 +44,20 @@ export default function CategoriasPage() {
 
   useEffect(() => {
     fetchItems()
+    fetchPlanoContas()
   }, [])
+
+  const fetchPlanoContas = async () => {
+    try {
+      const res = await fetch('/api/plano-contas')
+      const data = await res.json()
+      if (data.success) {
+        setPlanoContas(data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching plano-contas:', error)
+    }
+  }
 
   const handleCreate = async () => {
     try {
@@ -98,7 +112,7 @@ export default function CategoriasPage() {
     <>
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
-      <Box sx={{ ml: { lg: '288px' } }}>
+      <Box sx={{ ml: { xs: 0, md: '280px' } }}>
         <Box
           component="header"
           sx={{
@@ -159,6 +173,8 @@ export default function CategoriasPage() {
                   <TableHead>
                     <TableRow>
                       <TableCell>Nome</TableCell>
+                      <TableCell>Tipo</TableCell>
+                      <TableCell>Plano de Conta</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell align="right">Ações</TableCell>
                     </TableRow>
@@ -166,7 +182,7 @@ export default function CategoriasPage() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">
                             {loading ? 'Carregando...' : 'Nenhum registro cadastrado. Clique em "Novo" para criar.'}
                           </Typography>
@@ -176,6 +192,8 @@ export default function CategoriasPage() {
                       items.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell sx={{ fontWeight: 500 }}>{item.nome}</TableCell>
+                          <TableCell>{item.tipo === 'debito' ? 'Débito' : 'Crédito'}</TableCell>
+                          <TableCell>{planoContas.find((pc) => pc.id === item.plano_conta_id)?.nome || '-'}</TableCell>
                           <TableCell>
                             <Chip
                               label={item.ativo !== false ? 'Ativo' : 'Inativo'}
@@ -214,6 +232,30 @@ export default function CategoriasPage() {
               onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
               required
             />
+            <FormControl fullWidth size="small">
+              <InputLabel>Tipo de Conta</InputLabel>
+              <Select
+                value={formData.tipo}
+                label="Tipo de Conta"
+                onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+              >
+                <MenuItem value="debito">Débito</MenuItem>
+                <MenuItem value="credito">Crédito</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Plano de Conta (último nível)</InputLabel>
+              <Select
+                value={formData.plano_conta_id ?? ''}
+                label="Plano de Conta (último nível)"
+                onChange={(e) => setFormData({ ...formData, plano_conta_id: e.target.value ? Number(e.target.value) : null })}
+              >
+                <MenuItem value="">Nenhum</MenuItem>
+                {planoContas.map((pc) => (
+                  <MenuItem key={pc.id} value={pc.id}>{pc.codigo} - {pc.nome} (Nível {pc.nivel})</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <FormControlLabel
               control={
                 <Switch

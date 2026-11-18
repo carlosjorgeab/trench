@@ -25,7 +25,7 @@ export default function DashboardPage() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Sidebar />
-      <Box sx={{ ml: { lg: '288px' } }}>
+      <Box sx={{ ml: { xs: 0, md: '280px' } }}>
         {/* Top App Bar */}
         <Box
           component="header"

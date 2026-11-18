@@ -126,8 +126,8 @@ body {
 .sidebar-offset {
   margin-left: 0;
 }
-@media (min-width: 1024px) {
+@media (min-width: 900px) {
   .sidebar-offset {
-    margin-left: 288px;
+    margin-left: 280px;
   }
 }
