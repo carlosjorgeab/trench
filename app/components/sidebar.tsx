@@ -4,6 +4,7 @@ import { useState, useEffect, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSupabase } from '../lib/supabase-context'
+import { useAppUser } from '../lib/user-context'
 import { useThemeConfig } from '../lib/theme-config-context'
 import {
   Box,
@@ -77,6 +78,7 @@ export function Sidebar({ mobileOpen: externalMobileOpen, onMobileClose }: Sideb
   const pathname = usePathname()
   const router = useRouter()
   const { supabase, refreshUser, user } = useSupabase()
+  const { appUser } = useAppUser()
   const { config, setMode } = useThemeConfig()
   const theme = useTheme()
 
@@ -320,12 +322,27 @@ export function Sidebar({ mobileOpen: externalMobileOpen, onMobileClose }: Sideb
                 bgcolor: 'success.main',
               }}
             />
-            <Typography variant="caption" sx={{ fontWeight: 600 }} noWrap>
-              Trench Holding S/A
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Avatar
+                variant="rounded"
+                sx={{
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  width: 24,
+                  height: 24,
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                }}
+              >
+                T
+              </Avatar>
+              <Typography variant="caption" sx={{ fontWeight: 600 }} noWrap>
+                {appUser?.empresa_nome || 'Empresa não definida'}
+              </Typography>
+            </Box>
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem' }}>
-            Matriz
+            {appUser?.empresa_tipo || '---'}
           </Typography>
         </Box>
       </Box>

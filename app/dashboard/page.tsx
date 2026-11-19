@@ -33,13 +33,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Tooltip,
-  Snackbar,
-  Alert,
   useTheme,
   alpha,
 } from '@mui/material'
@@ -57,9 +51,7 @@ import {
   Search,
   Eye,
   EyeOff,
-  CreditCard,
   Wallet,
-  Building2,
   Calendar,
   Filter,
   Download,
@@ -69,8 +61,6 @@ import {
   Clock,
   Layers,
   Globe,
-  Sparkles,
-  ExternalLink,
   ChevronRight,
   ArrowRight,
   RefreshCw,
@@ -83,24 +73,8 @@ export default function DashboardPage() {
 
   // State controls
   const [hideValues, setHideValues] = useState(false)
-  const [selectedCompany, setSelectedCompany] = useState('todas')
   const [selectedPeriod, setSelectedPeriod] = useState('mes')
   const [activeTab, setActiveTab] = useState(0)
-  const [newTransactionModal, setNewTransactionModal] = useState(false)
-  const [interfaceGalleryModal, setInterfaceGalleryModal] = useState(false)
-  const [selectedGalleryImg, setSelectedGalleryImg] = useState('/images/Interface-I.jpeg')
-  const [snackbarOpen, setSnackbarOpen] = useState(false)
-  const [snackbarMessage, setSnackbarMessage] = useState('')
-
-  // Form for quick transaction
-  const [transactionForm, setTransactionForm] = useState({
-    tipo: 'despesa',
-    descricao: '',
-    valor: '',
-    conta: 'itau',
-    categoria: 'servicos',
-    vencimento: new Date().toISOString().split('T')[0],
-  })
 
   // Format currency helper with privacy toggle
   const formatMoney = (value: number) => {
@@ -244,43 +218,6 @@ export default function DashboardPage() {
     },
   ]
 
-  const referenceDesigns = [
-    {
-      id: 'I',
-      title: 'Interface I — Analytics Executivo & Visão Geral',
-      path: '/images/Interface-I.jpeg',
-      description: 'Estrutura refinada de cards de alta densidade e gráficos de performance com paleta harmônica',
-    },
-    {
-      id: 'II',
-      title: 'Interface II — Fluxo Financeiro & Indicadores',
-      path: '/images/Interface-II.jpeg',
-      description: 'Distribuição proporcional de ativos, liquidez e acompanhamento contábil',
-    },
-    {
-      id: 'III',
-      title: 'Interface III — Balanço Integrado & DRE',
-      path: '/images/Interface-III.jpeg',
-      description: 'Painel expandido para auditoria, controle bancário e métricas multi-departamentais',
-    },
-    {
-      id: 'IV',
-      title: 'Interface IV — Tesouraria & Conciliação Avançada',
-      path: '/images/Interface-IV.jpeg',
-      description: 'Visão aprofundada de contas a pagar, receber e extratos detalhados',
-    },
-  ]
-
-  const handleSaveTransaction = () => {
-    if (!transactionForm.descricao || !transactionForm.valor) {
-      alert('Preencha a descrição e o valor.')
-      return
-    }
-    setNewTransactionModal(false)
-    setSnackbarMessage('Lançamento registrado com sucesso no fluxo financeiro!')
-    setSnackbarOpen(true)
-  }
-
   return (
     <AppShell
       title="Painel Financeiro Executivo"
@@ -302,26 +239,6 @@ export default function DashboardPage() {
               {hideValues ? <EyeOff size={18} /> : <Eye size={18} />}
             </IconButton>
           </Tooltip>
-
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<Layers size={16} />}
-            onClick={() => setInterfaceGalleryModal(true)}
-            sx={{ fontWeight: 600 }}
-          >
-            Modelos de Design
-          </Button>
-
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<Plus size={16} />}
-            onClick={() => setNewTransactionModal(true)}
-            sx={{ fontWeight: 600 }}
-          >
-            Novo Lançamento
-          </Button>
         </Box>
       }
     >
@@ -342,31 +259,6 @@ export default function DashboardPage() {
             bgcolor: 'background.paper',
           }}
         >
-          {/* Seletor de Empresa */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Building2 size={20} color={theme.palette.primary.main} />
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 600 }}>
-                EMPRESA CONSOLIDADA
-              </Typography>
-              <Select
-                size="small"
-                variant="standard"
-                value={selectedCompany}
-                onChange={(e) => setSelectedCompany(e.target.value)}
-                disableUnderline
-                sx={{ fontWeight: 700, fontSize: '0.95rem' }}
-              >
-                <MenuItem value="todas">Todas as Empresas (Consolidado Grupo)</MenuItem>
-                <MenuItem value="matriz">Trench Holding S/A (Matriz)</MenuItem>
-                <MenuItem value="sp">Filial São Paulo</MenuItem>
-                <MenuItem value="rj">Filial Rio de Janeiro</MenuItem>
-              </Select>
-            </Box>
-          </Box>
-
-          <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' } }} />
-
           {/* Seletor de Período */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Calendar size={18} color={theme.palette.text.secondary} />
@@ -885,86 +777,19 @@ export default function DashboardPage() {
             </Card>
           </Grid>
 
-          {/* Distribuição de Despesas & Cartão Virtual Corporativo (1/3 da largura) */}
+          {/* Distribuição de Despesas (1/3 da largura) */}
           <Grid item xs={12} lg={4}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {/* Cartão Corporativo Estilizado */}
-              <Card
-                elevation={0}
-                sx={{
-                  p: 2.5,
-                  borderRadius: `${config.borderRadius + 4}px`,
-                  background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                  color: '#ffffff',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="caption" sx={{ letterSpacing: '0.12em', fontWeight: 700, color: '#94a3b8' }}>
-                    TRENCH PLATINUM CORPORATE
-                  </Typography>
-                  <CreditCard size={22} color="#38bdf8" />
-                </Box>
-
-                {/* Chip dourado do cartão */}
-                <Box
-                  sx={{
-                    width: 38,
-                    height: 28,
-                    borderRadius: 1,
-                    background: 'linear-gradient(135deg, #fcd34d 0%, #b45309 100%)',
-                    mb: 2,
-                    border: '1px solid #78350f',
-                  }}
-                />
-
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontFamily: 'monospace',
-                    letterSpacing: '0.18em',
-                    fontWeight: 700,
-                    mb: 1.5,
-                  }}
-                >
-                  •••• •••• •••• 8492
+            <Card elevation={0}>
+              <CardContent sx={{ p: 2.5 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  Despesas por Centro de Custo
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                  Participação percentual nas despesas correntes
                 </Typography>
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                  <Box>
-                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.65rem' }}>
-                      TITULAR
-                    </Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                      CARLOS JORGE / CEO
-                    </Typography>
-                  </Box>
-                  <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.65rem' }}>
-                      LIMITE DISPONÍVEL
-                    </Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#38bdf8' }}>
-                      {formatMoney(85000)}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Card>
-
-              {/* Card de Despesas por Categoria */}
-              <Card elevation={0}>
-                <CardContent sx={{ p: 2.5 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
-                    Despesas por Centro de Custo
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                    Participação percentual nas despesas correntes
-                  </Typography>
-
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {categoryExpenses.map((cat) => (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {categoryExpenses.map((cat) => (
                       <Box key={cat.name}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -995,7 +820,6 @@ export default function DashboardPage() {
                   </Box>
                 </CardContent>
               </Card>
-            </Box>
           </Grid>
         </Grid>
 
@@ -1161,238 +985,7 @@ export default function DashboardPage() {
           </Grid>
         </Grid>
 
-        {/* Seção de Modelos e Demonstrações Visuais de Interface */}
-        <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-          <Box
-            sx={{
-              p: 2.5,
-              borderBottom: '1px solid',
-              borderColor: 'divider',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 2,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Avatar
-                sx={{
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: 'primary.main',
-                  width: 40,
-                  height: 40,
-                }}
-              >
-                <Sparkles size={20} />
-              </Avatar>
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Galeria de Referências Visuais e Modelos de Interface (TRENCH)
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Designs de alta fidelidade integrados: Interface I, II, III e IV para sistemas financeiros
-                </Typography>
-              </Box>
-            </Box>
-
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<ExternalLink size={16} />}
-              onClick={() => setInterfaceGalleryModal(true)}
-            >
-              Expandir Galeria
-            </Button>
-          </Box>
-
-          <CardContent sx={{ p: 2.5 }}>
-            <Grid container spacing={2}>
-              {referenceDesigns.map((design) => (
-                <Grid item xs={12} sm={6} md={3} key={design.id}>
-                  <Paper
-                    elevation={0}
-                    onClick={() => {
-                      setSelectedGalleryImg(design.path)
-                      setInterfaceGalleryModal(true)
-                    }}
-                    sx={{
-                      cursor: 'pointer',
-                      borderRadius: `${config.borderRadius}px`,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      overflow: 'hidden',
-                      transition: 'all 0.25s ease',
-                      '&:hover': {
-                        borderColor: 'primary.main',
-                        transform: 'translateY(-3px)',
-                        boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.15)}`,
-                      },
-                    }}
-                  >
-                    <Box
-                      component="img"
-                      src={design.path}
-                      alt={design.title}
-                      sx={{
-                        width: '100%',
-                        height: 140,
-                        objectFit: 'cover',
-                        display: 'block',
-                        bgcolor: 'action.hover',
-                      }}
-                    />
-                    <Box sx={{ p: 1.5 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.85rem' }} noWrap>
-                        {design.title}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                        {design.description}
-                      </Typography>
-                    </Box>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          </CardContent>
-        </Card>
-      </Box>
-
-      {/* Modal de Criação Rápida de Lançamento */}
-      <Dialog
-        open={newTransactionModal}
-        onClose={() => setNewTransactionModal(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: `${config.borderRadius}px` } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700 }}>Novo Lançamento Financeiro</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-          <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-            <Button
-              variant={transactionForm.tipo === 'receita' ? 'contained' : 'outlined'}
-              color="success"
-              fullWidth
-              onClick={() => setTransactionForm({ ...transactionForm, tipo: 'receita' })}
-            >
-              + Receita
-            </Button>
-            <Button
-              variant={transactionForm.tipo === 'despesa' ? 'contained' : 'outlined'}
-              color="error"
-              fullWidth
-              onClick={() => setTransactionForm({ ...transactionForm, tipo: 'despesa' })}
-            >
-              - Despesa
-            </Button>
-          </Box>
-
-          <TextField
-            fullWidth
-            size="small"
-            label="Descrição do Lançamento *"
-            placeholder="Ex: Pagamento Fornecedor de TI"
-            value={transactionForm.descricao}
-            onChange={(e) => setTransactionForm({ ...transactionForm, descricao: e.target.value })}
-          />
-
-          <TextField
-            fullWidth
-            size="small"
-            label="Valor Nominal (R$) *"
-            type="number"
-            placeholder="0,00"
-            value={transactionForm.valor}
-            onChange={(e) => setTransactionForm({ ...transactionForm, valor: e.target.value })}
-          />
-
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
-              <FormControl fullWidth size="small">
-                <Select
-                  value={transactionForm.conta}
-                  onChange={(e) => setTransactionForm({ ...transactionForm, conta: e.target.value })}
-                >
-                  <MenuItem value="itau">Itaú Unibanco</MenuItem>
-                  <MenuItem value="bradesco">Bradesco Prime</MenuItem>
-                  <MenuItem value="santander">Santander Empresas</MenuItem>
-                  <MenuItem value="caixa">Caixa Tesouraria</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Data de Vencimento"
-                type="date"
-                value={transactionForm.vencimento}
-                onChange={(e) => setTransactionForm({ ...transactionForm, vencimento: e.target.value })}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, pt: 0 }}>
-          <Button onClick={() => setNewTransactionModal(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSaveTransaction}>
-            Salvar Lançamento
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Modal Expandido da Galeria de Interfaces */}
-      <Dialog
-        open={interfaceGalleryModal}
-        onClose={() => setInterfaceGalleryModal(false)}
-        maxWidth="lg"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: `${config.borderRadius}px` } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Modelos e Referências de Interface Financeira
-          <Button onClick={() => setInterfaceGalleryModal(false)}>Fechar</Button>
-        </DialogTitle>
-        <DialogContent sx={{ p: 2 }}>
-          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-            {referenceDesigns.map((d) => (
-              <Chip
-                key={d.id}
-                label={d.title.split('—')[0].trim()}
-                clickable
-                color={selectedGalleryImg === d.path ? 'primary' : 'default'}
-                onClick={() => setSelectedGalleryImg(d.path)}
-                sx={{ fontWeight: 600 }}
-              />
-            ))}
-          </Box>
-          <Box
-            component="img"
-            src={selectedGalleryImg}
-            alt="Interface Design Reference"
-            sx={{
-              width: '100%',
-              maxHeight: '75vh',
-              objectFit: 'contain',
-              borderRadius: 2,
-              bgcolor: 'action.hover',
-              border: '1px solid',
-              borderColor: 'divider',
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Feedback Snackbar */}
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={3500}
-        onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert onClose={() => setSnackbarOpen(false)} severity="success" sx={{ width: '100%', fontWeight: 500 }}>
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
+    </Box>
     </AppShell>
   )
 }

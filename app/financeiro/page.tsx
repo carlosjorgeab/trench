@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { AppShell } from '../components/AppShell'
-import { Box, Grid, Card, CardContent, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Autocomplete } from '@mui/material'
+import { Box, Grid, Card, CardContent, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Autocomplete, Alert, AlertTitle } from '@mui/material'
 import { DollarSign, Search, Filter, Plus, Download, X, Paperclip } from 'lucide-react'
 import FileUpload from '../components/FileUpload'
+import { useAppUser } from '../lib/user-context'
 
 interface Lancamento {
   id: number
@@ -34,6 +35,7 @@ interface Option {
 }
 
 export default function FinanceiroPage() {
+  const { appUser } = useAppUser()
   const [filterStatus, setFilterStatus] = useState('todos')
   const [filterTipo, setFilterTipo] = useState('todos')
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
@@ -42,6 +44,7 @@ export default function FinanceiroPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([])
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Options for selects
   const [empresas, setEmpresas] = useState<Option[]>([])
@@ -73,7 +76,7 @@ export default function FinanceiroPage() {
   const fetchOptions = async () => {
     const endpoints = ['empresas', 'contas', 'categorias', 'formas-pagamento', 'centros-custos', 'clientes', 'fornecedores']
     const setters = [setEmpresas, setContas, setCategorias, setFormasPagamento, setCentrosCusto, setClientes, setFornecedores]
-    
+
     for (let i = 0; i < endpoints.length; i++) {
       try {
         const res = await fetch(`/api/${endpoints[i]}`)
@@ -108,9 +111,14 @@ export default function FinanceiroPage() {
   }, [])
 
   const handleCreate = async () => {
+    setSaveError(null)
+    if (!appUser?.empresa_id) {
+      setSaveError('Usuário não vinculado a nenhuma empresa. Entre em contato com o administrador.')
+      return
+    }
     try {
       const body = {
-        empresa_id: 1,
+        empresa_id: appUser.empresa_id,
         tipo: formData.tipo,
         conta_id: formData.conta_id ? parseInt(formData.conta_id) : null,
         categoria_id: formData.categoria_id ? parseInt(formData.categoria_id) : null,
@@ -144,9 +152,12 @@ export default function FinanceiroPage() {
         setEditingId(null)
         resetForm()
         fetchLancamentos()
+      } else {
+        setSaveError(data.error || 'Erro ao salvar lançamento')
       }
     } catch (error) {
       console.error('Error saving lancamento:', error)
+      setSaveError('Erro de conexão ao salvar lançamento')
     }
   }
 
@@ -189,6 +200,7 @@ export default function FinanceiroPage() {
       data_pagamento: lanc.data_pagamento?.split('T')[0] || '',
       status: lanc.status,
     })
+    setSaveError(null)
     setOpenDialog(true)
   }
 
@@ -237,6 +249,7 @@ export default function FinanceiroPage() {
           onClick={() => {
             setEditingId(null)
             resetForm()
+            setSaveError(null)
             setOpenDialog(true)
           }}
         >
@@ -262,142 +275,148 @@ export default function FinanceiroPage() {
           ))}
         </Grid>
 
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
-                Filtros
-              </Typography>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} sm={3}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={filterStatus}
-                      label="Status"
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                    >
-                      <MenuItem value="todos">Todos</MenuItem>
-                      <MenuItem value="pendente">Pendente</MenuItem>
-                      <MenuItem value="pago">Pago</MenuItem>
-                      <MenuItem value="vencido">Vencido</MenuItem>
-                      <MenuItem value="cancelado">Cancelado</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={3}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Tipo</InputLabel>
-                    <Select
-                      value={filterTipo}
-                      label="Tipo"
-                      onChange={(e) => setFilterTipo(e.target.value)}
-                    >
-                      <MenuItem value="todos">Todos</MenuItem>
-                      <MenuItem value="debito">Débito</MenuItem>
-                      <MenuItem value="credito">Crédito</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Busca"
-                    placeholder="Descrição..."
-                    InputProps={{
-                      startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={2}>
-                  <Button variant="outlined" fullWidth startIcon={<Filter size={16} />}>
-                    Filtrar
-                  </Button>
-                </Grid>
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
+              Filtros
+            </Typography>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    value={filterStatus}
+                    label="Status"
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                  >
+                    <MenuItem value="todos">Todos</MenuItem>
+                    <MenuItem value="pendente">Pendente</MenuItem>
+                    <MenuItem value="pago">Pago</MenuItem>
+                    <MenuItem value="vencido">Vencido</MenuItem>
+                    <MenuItem value="cancelado">Cancelado</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
-            </CardContent>
-          </Card>
+              <Grid item xs={12} sm={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Tipo</InputLabel>
+                  <Select
+                    value={filterTipo}
+                    label="Tipo"
+                    onChange={(e) => setFilterTipo(e.target.value)}
+                  >
+                    <MenuItem value="todos">Todos</MenuItem>
+                    <MenuItem value="debito">Débito</MenuItem>
+                    <MenuItem value="credito">Crédito</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Busca"
+                  placeholder="Descrição..."
+                  InputProps={{
+                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={2}>
+                <Button variant="outlined" fullWidth startIcon={<Filter size={16} />}>
+                  Filtrar
+                </Button>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
-                Lançamentos
-              </Typography>
-              <TableContainer component={Paper} elevation={0} sx={{ overflowX: 'auto', width: '100%' }}>
-                <Table sx={{ minWidth: 800 }}>
-                  <TableHead>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
+              Lançamentos
+            </Typography>
+            <TableContainer component={Paper} elevation={0} sx={{ overflowX: 'auto', width: '100%' }}>
+              <Table sx={{ minWidth: 800 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Data</TableCell>
+                    <TableCell>Tipo</TableCell>
+                    <TableCell>Descrição</TableCell>
+                    <TableCell>Valor Principal</TableCell>
+                    <TableCell>Juros</TableCell>
+                    <TableCell>Acréscimos</TableCell>
+                    <TableCell>Total</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell align="right">Ações</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredLancamentos.length === 0 ? (
                     <TableRow>
-                      <TableCell>Data</TableCell>
-                      <TableCell>Tipo</TableCell>
-                      <TableCell>Descrição</TableCell>
-                      <TableCell>Valor Principal</TableCell>
-                      <TableCell>Juros</TableCell>
-                      <TableCell>Acréscimos</TableCell>
-                      <TableCell>Total</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell align="right">Ações</TableCell>
+                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                        <Typography color="text.secondary">
+                          {loading ? 'Carregando...' : 'Nenhum lançamento encontrado. Clique em "Novo Lançamento" para criar.'}
+                        </Typography>
+                      </TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredLancamentos.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                          <Typography color="text.secondary">
-                            {loading ? 'Carregando...' : 'Nenhum lançamento encontrado. Clique em "Novo Lançamento" para criar.'}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredLancamentos.map((lanc) => {
-                        const total = (lanc.valor_principal || 0) + (lanc.juros || 0) + (lanc.acrecimos || 0)
-                        return (
-                          <TableRow key={lanc.id}>
-                            <TableCell>{new Date(lanc.data_lancamento).toLocaleDateString('pt-BR')}</TableCell>
-                            <TableCell>
-                              <Chip
-                                label={lanc.tipo === 'debito' ? 'Débito' : 'Crédito'}
-                                size="small"
-                                color={lanc.tipo === 'debito' ? 'error' : 'success'}
-                              />
-                            </TableCell>
-                            <TableCell>{lanc.descricao}</TableCell>
-                            <TableCell>
-                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lanc.valor_principal)}
-                            </TableCell>
-                            <TableCell>
-                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lanc.juros || 0)}
-                            </TableCell>
-                            <TableCell>
-                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lanc.acrecimos || 0)}
-                            </TableCell>
-                            <TableCell sx={{ fontWeight: 600, color: lanc.tipo === 'debito' ? 'error.main' : 'success.main' }}>
-                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                label={lanc.status}
-                                size="small"
-                                color={lanc.status === 'pago' ? 'success' : lanc.status === 'vencido' ? 'error' : lanc.status === 'cancelado' ? 'default' : 'warning'}
-                              />
-                            </TableCell>
-                            <TableCell align="right">
-                              <Button size="small" variant="text" onClick={() => handleEdit(lanc)}>Editar</Button>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </CardContent>
-          </Card>
-        </Box>
+                  ) : (
+                    filteredLancamentos.map((lanc) => {
+                      const total = (lanc.valor_principal || 0) + (lanc.juros || 0) + (lanc.acrecimos || 0)
+                      return (
+                        <TableRow key={lanc.id}>
+                          <TableCell>{new Date(lanc.data_lancamento).toLocaleDateString('pt-BR')}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={lanc.tipo === 'debito' ? 'Débito' : 'Crédito'}
+                              size="small"
+                              color={lanc.tipo === 'debito' ? 'error' : 'success'}
+                            />
+                          </TableCell>
+                          <TableCell>{lanc.descricao}</TableCell>
+                          <TableCell>
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lanc.valor_principal)}
+                          </TableCell>
+                          <TableCell>
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lanc.juros || 0)}
+                          </TableCell>
+                          <TableCell>
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lanc.acrecimos || 0)}
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: lanc.tipo === 'debito' ? 'error.main' : 'success.main' }}>
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={lanc.status}
+                              size="small"
+                              color={lanc.status === 'pago' ? 'success' : lanc.status === 'vencido' ? 'error' : lanc.status === 'cancelado' ? 'default' : 'warning'}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Button size="small" variant="text" onClick={() => handleEdit(lanc)}>Editar</Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      </Box>
 
       {/* Dialog for new/edit lancamento */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>{editingId ? 'Editar Lançamento' : 'Novo Lançamento'}</DialogTitle>
         <DialogContent>
+          {saveError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSaveError(null)}>
+              <AlertTitle>Erro ao salvar</AlertTitle>
+              {saveError}
+            </Alert>
+          )}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>

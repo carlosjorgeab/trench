@@ -45,3 +45,48 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id, ...updateData } = body
+
+    const { data, error } = await supabase
+      .from('lancamentos')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+
+    if (error) throw error
+
+    return NextResponse.json({ success: true, data: data[0] })
+  } catch (error) {
+    console.error('Error updating lancamento:', error)
+    return NextResponse.json(
+      { success: false, error: 'Erro ao atualizar lançamento' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    const { error } = await supabase
+      .from('lancamentos')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting lancamento:', error)
+    return NextResponse.json(
+      { success: false, error: 'Erro ao deletar lançamento' },
+      { status: 500 }
+    )
+  }
+}

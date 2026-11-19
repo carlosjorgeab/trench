@@ -5,6 +5,7 @@ import { SupabaseProvider } from './lib/supabase-context'
 import { ThemeConfigProvider } from './lib/theme-config-context'
 import { ThemeProvider } from './lib/theme-context'
 import { AppThemeProvider } from './lib/app-theme-provider'
+import { UserProvider } from './lib/user-context'
 import './globals.css'
 
 interface RootLayoutProps {
@@ -28,7 +29,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
           <ThemeProvider>
             <AppThemeProvider>
               <SupabaseProvider>
-                {children}
+                <UserProvider>
+                  {children}
+                </UserProvider>
               </SupabaseProvider>
             </AppThemeProvider>
           </ThemeProvider>

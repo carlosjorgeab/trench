@@ -29,7 +29,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser()
       setUser(currentUser)
-    } catch (error) {
+    } catch {
       setUser(null)
     }
   }
