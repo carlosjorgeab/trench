@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { AppShell } from '../components/AppShell'
-import { Box, Grid, Card, CardContent, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Autocomplete, Alert, AlertTitle } from '@mui/material'
-import { DollarSign, Search, Filter, Plus, Download, X, Paperclip } from 'lucide-react'
+import { Box, Grid, Card, CardContent, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Alert, AlertTitle, Checkbox } from '@mui/material'
+import { DollarSign, Search, Filter, Plus, Download, X, Paperclip, Calendar, Copy, Trash2, Edit } from 'lucide-react'
 import FileUpload from '../components/FileUpload'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useAppUser } from '../lib/user-context'
 
 interface Lancamento {
@@ -34,10 +35,17 @@ interface Option {
   nome: string
 }
 
+type PeriodOption = 'hoje' | 'semana' | 'mes' | 'ano' | 'todo' | 'ultimos30' | 'ultimos12meses' | 'personalizado'
+
 export default function FinanceiroPage() {
   const { appUser } = useAppUser()
-  const [filterStatus, setFilterStatus] = useState('todos')
   const [filterTipo, setFilterTipo] = useState('todos')
+  const [filterCategoria, setFilterCategoria] = useState('todos')
+  const [filterCentroCusto, setFilterCentroCusto] = useState('todos')
+  const [filterPeriodo, setFilterPeriodo] = useState<PeriodOption>('mes')
+  const [filterDataInicio, setFilterDataInicio] = useState('')
+  const [filterDataFim, setFilterDataFim] = useState('')
+  const [filterDescricao, setFilterDescricao] = useState('')
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [loading, setLoading] = useState(false)
   const [openDialog, setOpenDialog] = useState(false)
@@ -45,15 +53,6 @@ export default function FinanceiroPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([])
   const [saveError, setSaveError] = useState<string | null>(null)
-
-  // Options for selects
-  const [empresas, setEmpresas] = useState<Option[]>([])
-  const [contas, setContas] = useState<Option[]>([])
-  const [categorias, setCategorias] = useState<Option[]>([])
-  const [formasPagamento, setFormasPagamento] = useState<Option[]>([])
-  const [centrosCusto, setCentrosCusto] = useState<Option[]>([])
-  const [clientes, setClientes] = useState<Option[]>([])
-  const [fornecedores, setFornecedores] = useState<Option[]>([])
 
   const [formData, setFormData] = useState({
     tipo: 'debito',
@@ -73,13 +72,175 @@ export default function FinanceiroPage() {
     status: 'pendente',
   })
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; ids: number[] }>({ open: false, ids: [] })
+
+  const openDeleteConfirm = (ids: number[]) => {
+    setDeleteConfirm({ open: true, ids })
+  }
+
+  const closeDeleteConfirm = () => {
+    setDeleteConfirm({ open: false, ids: [] })
+  }
+
+  const executeDelete = async () => {
+    const { ids } = deleteConfirm
+    if (ids.length === 0) return
+    try {
+      for (const id of ids) {
+        await fetch(`/api/lancamentos?id=${id}`, { method: 'DELETE' })
+      }
+      setSelectedIds(new Set())
+      fetchLancamentos()
+    } catch (error) {
+      console.error('Error deleting:', error)
+    } finally {
+      closeDeleteConfirm()
+    }
+  }
+
+  const toggleSelection = (id: number) => {
+    const newSelection = new Set(selectedIds)
+    if (newSelection.has(id)) {
+      newSelection.delete(id)
+    } else {
+      newSelection.add(id)
+    }
+    setSelectedIds(newSelection)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredLancamentos.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredLancamentos.map(l => l.id)))
+    }
+  }
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return
+    openDeleteConfirm(Array.from(selectedIds))
+  }
+
+  const handleBulkDuplicate = async () => {
+    if (selectedIds.size === 0) return
+    if (!appUser?.empresa_id) return
+    try {
+      const toDuplicate = filteredLancamentos.filter(l => selectedIds.has(l.id))
+      for (const lanc of toDuplicate) {
+        const body = {
+          empresa_id: appUser.empresa_id,
+          tipo: lanc.tipo,
+          conta_id: lanc.conta_id,
+          categoria_id: lanc.categoria_id,
+          forma_pagamento_id: lanc.forma_pagamento_id,
+          centro_custo_id: lanc.centro_custo_id,
+          cliente_id: lanc.cliente_id,
+          descricao: `${lanc.descricao} (Cópia)`,
+          observacao: lanc.observacao,
+          valor_principal: lanc.valor_principal,
+          juros: lanc.juros,
+          acrecimos: lanc.acrecimos,
+          data_lancamento: new Date().toISOString().split('T')[0],
+          data_vencimento: new Date(lanc.data_vencimento).toISOString().split('T')[0],
+          data_pagamento: null,
+          status: 'pendente',
+          anexos: [],
+        }
+        await fetch('/api/lancamentos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      }
+      setSelectedIds(new Set())
+      fetchLancamentos()
+    } catch (error) {
+      console.error('Error bulk duplicating:', error)
+    }
+  }
+
+  // Options for selects
+  const [empresas, setEmpresas] = useState<Option[]>([])
+  const [contas, setContas] = useState<Option[]>([])
+  const [categorias, setCategorias] = useState<Option[]>([])
+  const [formasPagamento, setFormasPagamento] = useState<Option[]>([])
+  const [centrosCusto, setCentrosCusto] = useState<Option[]>([])
+  const [clientes, setClientes] = useState<Option[]>([])
+  const [fornecedores, setFornecedores] = useState<Option[]>([])
+
+  const periodOptions: { value: PeriodOption; label: string }[] = [
+    { value: 'hoje', label: 'Hoje' },
+    { value: 'semana', label: 'Semana' },
+    { value: 'mes', label: 'Mês' },
+    { value: 'ano', label: 'Ano' },
+    { value: 'todo', label: 'Todo Período' },
+    { value: 'ultimos30', label: '30 Últimos Dias' },
+    { value: 'ultimos12meses', label: '12 Últimos Meses' },
+    { value: 'personalizado', label: 'Personalizado' },
+  ]
+
+  const getPeriodLabel = (period: PeriodOption) => {
+    const opt = periodOptions.find(o => o.value === period)
+    return opt?.label || period
+  }
+
+  const getDateRange = (period: PeriodOption) => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    
+    switch (period) {
+      case 'hoje':
+        return { inicio: today.toISOString().split('T')[0], fim: today.toISOString().split('T')[0] }
+      case 'semana': {
+        const start = new Date(today)
+        start.setDate(today.getDate() - today.getDay())
+        const end = new Date(start)
+        end.setDate(start.getDate() + 6)
+        return { inicio: start.toISOString().split('T')[0], fim: end.toISOString().split('T')[0] }
+      }
+      case 'mes': {
+        const start = new Date(today.getFullYear(), today.getMonth(), 1)
+        const end = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+        return { inicio: start.toISOString().split('T')[0], fim: end.toISOString().split('T')[0] }
+      }
+      case 'ano': {
+        const start = new Date(today.getFullYear(), 0, 1)
+        const end = new Date(today.getFullYear(), 11, 31)
+        return { inicio: start.toISOString().split('T')[0], fim: end.toISOString().split('T')[0] }
+      }
+      case 'todo':
+        return { inicio: '', fim: '' }
+      case 'ultimos30': {
+        const start = new Date(today)
+        start.setDate(today.getDate() - 30)
+        return { inicio: start.toISOString().split('T')[0], fim: today.toISOString().split('T')[0] }
+      }
+      case 'ultimos12meses': {
+        const start = new Date(today.getFullYear(), today.getMonth() - 11, 1)
+        const end = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+        return { inicio: start.toISOString().split('T')[0], fim: end.toISOString().split('T')[0] }
+      }
+      case 'personalizado':
+        return { inicio: filterDataInicio, fim: filterDataFim }
+      default:
+        return { inicio: '', fim: '' }
+    }
+  }
+
+  const { inicio: periodInicio, fim: periodFim } = getDateRange(filterPeriodo)
+
   const fetchOptions = async () => {
+    if (!appUser?.empresa_id) return
     const endpoints = ['empresas', 'contas', 'categorias', 'formas-pagamento', 'centros-custos', 'clientes', 'fornecedores']
     const setters = [setEmpresas, setContas, setCategorias, setFormasPagamento, setCentrosCusto, setClientes, setFornecedores]
 
     for (let i = 0; i < endpoints.length; i++) {
       try {
-        const res = await fetch(`/api/${endpoints[i]}`)
+        const res = await fetch(`/api/${endpoints[i]}?empresa_id=${appUser.empresa_id}`)
         const data = await res.json()
         if (data.success) {
           setters[i](data.data || [])
@@ -91,9 +252,10 @@ export default function FinanceiroPage() {
   }
 
   const fetchLancamentos = async () => {
+    if (!appUser?.empresa_id) return
     setLoading(true)
     try {
-      const res = await fetch('/api/lancamentos')
+      const res = await fetch(`/api/lancamentos?empresa_id=${appUser.empresa_id}`)
       const data = await res.json()
       if (data.success) {
         setLancamentos(data.data || [])
@@ -108,7 +270,7 @@ export default function FinanceiroPage() {
   useEffect(() => {
     fetchOptions()
     fetchLancamentos()
-  }, [])
+  }, [appUser?.empresa_id])
 
   const handleCreate = async () => {
     setSaveError(null)
@@ -117,6 +279,19 @@ export default function FinanceiroPage() {
       return
     }
     try {
+      const valorPrincipal = parseFloat(formData.valor_principal);
+      if (isNaN(valorPrincipal) || valorPrincipal <= 0) {
+        setSaveError('Informe um valor principal válido.');
+        return;
+      }
+      if (!formData.data_lancamento) {
+        setSaveError('Informe a data de lançamento.');
+        return;
+      }
+      if (!formData.data_vencimento) {
+        setSaveError('Informe a data de vencimento.');
+        return;
+      }
       const body = {
         empresa_id: appUser.empresa_id,
         tipo: formData.tipo,
@@ -127,7 +302,7 @@ export default function FinanceiroPage() {
         cliente_id: formData.cliente_id ? parseInt(formData.cliente_id) : null,
         descricao: formData.descricao,
         observacao: formData.observacao,
-        valor_principal: parseFloat(formData.valor_principal),
+        valor_principal: valorPrincipal,
         juros: parseFloat(formData.juros) || 0,
         acrecimos: parseFloat(formData.acrecimos) || 0,
         data_lancamento: formData.data_lancamento,
@@ -204,15 +379,8 @@ export default function FinanceiroPage() {
     setOpenDialog(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Tem certeza que deseja deletar este lançamento?')) {
-      try {
-        await fetch(`/api/lancamentos?id=${id}`, { method: 'DELETE' })
-        fetchLancamentos()
-      } catch (error) {
-        console.error('Error deleting lancamento:', error)
-      }
-    }
+  const handleDelete = (id: number) => {
+    openDeleteConfirm([id])
   }
 
   const totalReceitas = lancamentos
@@ -230,11 +398,24 @@ export default function FinanceiroPage() {
     { label: 'Saldo', value: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(saldo), color: 'info' },
   ]
 
-  const filteredLancamentos = lancamentos.filter((l) => {
-    if (filterStatus !== 'todos' && l.status !== filterStatus) return false
-    if (filterTipo !== 'todos' && l.tipo !== filterTipo) return false
-    return true
-  })
+  const filteredLancamentos = useMemo(() => {
+    console.log('Filtering:', { periodInicio, periodFim, filterDataInicio, filterDataFim, filterPeriodo, count: lancamentos.length })
+    return lancamentos.filter((l) => {
+      if (filterTipo !== 'todos' && l.tipo !== filterTipo) return false
+      if (filterCategoria !== 'todos' && l.categoria_id?.toString() !== filterCategoria) return false
+      if (filterCentroCusto !== 'todos' && l.centro_custo_id?.toString() !== filterCentroCusto) return false
+      
+      if (filterDescricao && !l.descricao?.toLowerCase().includes(filterDescricao.toLowerCase())) return false
+      
+      if (periodInicio && periodFim) {
+        const dataLanc = l.data_lancamento?.split('T')[0]
+        console.log('Checking date:', { dataLanc, periodInicio, periodFim, inRange: dataLanc >= periodInicio && dataLanc <= periodFim })
+        if (dataLanc && (dataLanc < periodInicio || dataLanc > periodFim)) return false
+      }
+      
+      return true
+    })
+  }, [lancamentos, filterTipo, filterCategoria, filterCentroCusto, filterDescricao, filterDataInicio, filterDataFim, periodInicio, periodFim])
 
   return (
     <AppShell
@@ -280,24 +461,38 @@ export default function FinanceiroPage() {
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
               Filtros
             </Typography>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} sm={3}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={filterStatus}
-                    label="Status"
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                  >
-                    <MenuItem value="todos">Todos</MenuItem>
-                    <MenuItem value="pendente">Pendente</MenuItem>
-                    <MenuItem value="pago">Pago</MenuItem>
-                    <MenuItem value="vencido">Vencido</MenuItem>
-                    <MenuItem value="cancelado">Cancelado</MenuItem>
-                  </Select>
-                </FormControl>
+            
+            {/* Linha 1: Busca por descrição + Legenda do período */}
+            <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+              <Grid item xs={12} sm={12} md={8}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Descrição"
+                  placeholder="Buscar por descrição..."
+                  value={filterDescricao}
+                  onChange={(e) => setFilterDescricao(e.target.value)}
+                  InputProps={{
+                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
+                  }}
+                />
               </Grid>
-              <Grid item xs={12} sm={3}>
+              <Grid item xs={12} sm={6} md={4} sx={{ display: 'flex', alignItems: 'center', minWidth: 0, justifyContent: 'flex-end' }}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  Período: <strong>{getPeriodLabel(filterPeriodo)}</strong>
+                  {filterPeriodo === 'personalizado' && periodInicio && periodFim && (
+                    <> ({periodInicio} a {periodFim})</>
+                  )}
+                  {filterPeriodo !== 'personalizado' && filterPeriodo !== 'todo' && periodInicio && periodFim && (
+                    <> ({periodInicio} a {periodFim})</>
+                  )}
+                </Typography>
+              </Grid>
+            </Grid>
+            
+            {/* Linha 2: Tipo, Categoria, Centro de Custo, Período */}
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={6} md={3}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Tipo</InputLabel>
                   <Select
@@ -311,35 +506,134 @@ export default function FinanceiroPage() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Busca"
-                  placeholder="Descrição..."
-                  InputProps={{
-                    startAdornment: <Search size={18} style={{ marginRight: 8, color: '#999' }} />,
-                  }}
-                />
+              <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Categoria</InputLabel>
+                  <Select
+                    value={filterCategoria}
+                    label="Categoria"
+                    onChange={(e) => setFilterCategoria(e.target.value)}
+                  >
+                    <MenuItem value="todos">Todas</MenuItem>
+                    {categorias.map((c) => (
+                      <MenuItem key={c.id} value={c.id.toString()}>{c.nome}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
-              <Grid item xs={12} sm={2}>
-                <Button variant="outlined" fullWidth startIcon={<Filter size={16} />}>
-                  Filtrar
-                </Button>
+              <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Centro de Custo</InputLabel>
+                  <Select
+                    value={filterCentroCusto}
+                    label="Centro de Custo"
+                    onChange={(e) => setFilterCentroCusto(e.target.value)}
+                  >
+                    <MenuItem value="todos">Todos</MenuItem>
+                    {centrosCusto.map((c) => (
+                      <MenuItem key={c.id} value={c.id.toString()}>{c.nome}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Período</InputLabel>
+                  <Select
+                    value={filterPeriodo}
+                    label="Período"
+                    onChange={(e) => setFilterPeriodo(e.target.value as PeriodOption)}
+                  >
+                    {periodOptions.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              {/* Período Personalizado - campos de data */}
+              {filterPeriodo === 'personalizado' && (
+                <>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Data Inicial"
+                      type="date"
+                      value={filterDataInicio}
+                      onChange={(e) => setFilterDataInicio(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      InputProps={{
+                        startAdornment: <Calendar size={18} style={{ marginRight: 8, color: '#999' }} />,
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Data Final"
+                      type="date"
+                      value={filterDataFim}
+                      onChange={(e) => setFilterDataFim(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                      InputProps={{
+                        startAdornment: <Calendar size={18} style={{ marginRight: 8, color: '#999' }} />,
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={2}>
+                    <Button 
+                      variant="contained" 
+                      fullWidth 
+                      startIcon={<Filter size={16} />}
+                      onClick={fetchLancamentos}
+                      sx={{ mt: 1.5 }}
+                    >
+                      Filtrar
+                    </Button>
+                  </Grid>
+                </>
+              )}
             </Grid>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent>
+            {/* Bulk Action Toolbar */}
+            {selectedIds.size > 0 && (
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Typography variant="body2" color="text.primary" sx={{ fontWeight: 500 }}>
+                  {selectedIds.size} lançamento(s) selecionado(s)
+                </Typography>
+                <Button variant="outlined" size="small" startIcon={<Copy size={16} />} onClick={handleBulkDuplicate}>
+                  Duplicar
+                </Button>
+                <Button variant="outlined" size="small" color="error" startIcon={<Trash2 size={16} />} onClick={handleBulkDelete}>
+                  Deletar
+                </Button>
+                <Button variant="text" size="small" onClick={() => setSelectedIds(new Set())}>
+                  Limpar seleção
+                </Button>
+              </Box>
+            )}
+
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
               Lançamentos
             </Typography>
             <TableContainer component={Paper} elevation={0} sx={{ overflowX: 'auto', width: '100%' }}>
-              <Table sx={{ minWidth: 800 }}>
+              <Table sx={{ minWidth: 900 }}>
                 <TableHead>
                   <TableRow>
+                    <TableCell style={{ width: 48 }}>
+                      <Checkbox
+                        checked={selectedIds.size === filteredLancamentos.length && filteredLancamentos.length > 0}
+                        indeterminate={selectedIds.size > 0 && selectedIds.size < filteredLancamentos.length}
+                        onChange={toggleSelectAll}
+                        size="small"
+                      />
+                    </TableCell>
                     <TableCell>Data</TableCell>
                     <TableCell>Tipo</TableCell>
                     <TableCell>Descrição</TableCell>
@@ -354,7 +648,7 @@ export default function FinanceiroPage() {
                 <TableBody>
                   {filteredLancamentos.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                         <Typography color="text.secondary">
                           {loading ? 'Carregando...' : 'Nenhum lançamento encontrado. Clique em "Novo Lançamento" para criar.'}
                         </Typography>
@@ -363,8 +657,16 @@ export default function FinanceiroPage() {
                   ) : (
                     filteredLancamentos.map((lanc) => {
                       const total = (lanc.valor_principal || 0) + (lanc.juros || 0) + (lanc.acrecimos || 0)
+                      const isSelected = selectedIds.has(lanc.id)
                       return (
-                        <TableRow key={lanc.id}>
+                        <TableRow key={lanc.id} selected={isSelected} sx={{ '&:hover': { bgcolor: isSelected ? 'action.selected' : 'action.hover' } }}>
+                          <TableCell style={{ width: 48 }}>
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={() => toggleSelection(lanc.id)}
+                              size="small"
+                            />
+                          </TableCell>
                           <TableCell>{new Date(lanc.data_lancamento).toLocaleDateString('pt-BR')}</TableCell>
                           <TableCell>
                             <Chip
@@ -394,7 +696,9 @@ export default function FinanceiroPage() {
                             />
                           </TableCell>
                           <TableCell align="right">
-                            <Button size="small" variant="text" onClick={() => handleEdit(lanc)}>Editar</Button>
+                            <IconButton size="small" onClick={() => handleEdit(lanc)} edge="end" aria-label="Editar">
+                              <Edit size={18} />
+                            </IconButton>
                           </TableCell>
                         </TableRow>
                       )
@@ -406,6 +710,21 @@ export default function FinanceiroPage() {
           </CardContent>
         </Card>
       </Box>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onClose={closeDeleteConfirm}
+        onConfirm={executeDelete}
+        title="Confirmar Exclusão"
+        message={deleteConfirm.ids.length > 1 
+          ? `Tem certeza que deseja excluir ${deleteConfirm.ids.length} lançamento(s)? Esta ação não pode ser desfeita.`
+          : 'Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.'
+        }
+        confirmText="Sim, Excluir"
+        cancelText="Não"
+        variant="danger"
+      />
 
       {/* Dialog for new/edit lancamento */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>

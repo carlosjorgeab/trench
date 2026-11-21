@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react'
-import { createClient, SupabaseClient, User } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 
 export interface AppUser {
   id: string
@@ -39,35 +39,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
     setLoadingAppUser(true)
     try {
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('id, nome, email, ativo, empresa_id, empresas ( nome )')
-        .eq('id', authId)
-        .eq('ativo', true)
-        .maybeSingle()
-
-      if (error || !data) {
+      const res = await fetch(`/api/auth/me?id=${encodeURIComponent(authId)}`)
+      if (!res.ok) {
         setAppUser(null)
         return null
       }
-
-      const emp = Array.isArray((data as any).empresas)
-        ? (data as any).empresas[0]
-        : (data as any).empresas
-
-      const user: AppUser = {
-        id: (data as any).id,
-        auth_id: (data as any).id,
-        nome: (data as any).nome,
-        email: (data as any).email,
-        perfil: 'usuario',
-        empresa_id: (data as any).empresa_id,
-        empresa_nome: emp?.nome ?? null,
-        empresa_tipo: null,
-        ativo: (data as any).ativo,
+      const json = await res.json()
+      if (!json.success || !json.data) {
+        setAppUser(null)
+        return null
       }
-      setAppUser(user)
-      return user
+      setAppUser(json.data)
+      return json.data
     } catch {
       setAppUser(null)
       return null

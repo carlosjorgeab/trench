@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const bucket = formData.get('bucket') as string || 'anexos'
+    const bucket = formData.get('bucket') as string || 'trench'
 
     if (!file) {
       return NextResponse.json(
@@ -41,10 +41,10 @@ export async function POST(request: NextRequest) {
         fileName: file.name,
       },
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error uploading file:', error)
     return NextResponse.json(
-      { success: false, error: 'Erro ao fazer upload do arquivo' },
+      { success: false, error: error?.message || 'Erro ao fazer upload do arquivo' },
       { status: 500 }
     )
   }

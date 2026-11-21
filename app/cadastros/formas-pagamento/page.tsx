@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { AppShell } from '../../components/AppShell'
-import { Box, Grid, Card, CardContent, Typography, Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Switch, FormControlLabel, FormControl, InputLabel, Select, MenuItem } from '@mui/material'
+import { Box, Grid, Card, CardContent, Typography, Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Switch, FormControlLabel, FormControl, InputLabel, Select, MenuItem, Alert } from '@mui/material'
 import { DollarSign, Plus, Edit, Trash2, Search } from 'lucide-react'
+import { useAppUser } from '../../lib/user-context'
 
 interface Item {
   id: number
@@ -13,19 +14,22 @@ interface Item {
 }
 
 export default function FormasdePagamentoPage() {
+  const { appUser } = useAppUser()
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(false)
   const [openDialog, setOpenDialog] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     nome: '',
     ativo: true,
   })
 
   const fetchItems = async () => {
+    if (!appUser?.empresa_id) return
     setLoading(true)
     try {
-      const res = await fetch('/api/formas-pagamento')
+      const res = await fetch(`/api/formas-pagamento?empresa_id=${appUser.empresa_id}`)
       const data = await res.json()
       if (data.success) {
         setItems(data.data || [])
@@ -39,12 +43,17 @@ export default function FormasdePagamentoPage() {
 
   useEffect(() => {
     fetchItems()
-  }, [])
+  }, [appUser?.empresa_id])
 
   const handleCreate = async () => {
+    setSaveError(null)
+    if (!appUser?.empresa_id) {
+      setSaveError('Usuário não vinculado a nenhuma empresa.')
+      return
+    }
     try {
       const method = editingId ? 'PUT' : 'POST'
-      const body = editingId ? { id: editingId, ...formData } : formData
+      const body = editingId ? { id: editingId, ...formData, empresa_id: appUser.empresa_id } : { ...formData, empresa_id: appUser.empresa_id }
 
       const res = await fetch('/api/formas-pagamento', {
         method,
@@ -60,9 +69,12 @@ export default function FormasdePagamentoPage() {
           ativo: true,
         })
         fetchItems()
+      } else {
+        setSaveError(data.error || 'Erro ao salvar forma de pagamento')
       }
     } catch (error) {
       console.error('Error saving formas-pagamento:', error)
+      setSaveError('Erro de conexão ao salvar')
     }
   }
 

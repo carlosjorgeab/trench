@@ -9,18 +9,18 @@ export default function Home() {
   const router = useRouter()
 
   useEffect(() => {
-    const checkUser = async () => {
-      await refreshUser()
-    }
-    checkUser()
+    refreshUser()
   }, [refreshUser])
 
   useEffect(() => {
-    if (user) {
-      router.push('/dashboard')
-    } else {
-      router.push('/auth/login')
-    }
+    const timer = setTimeout(() => {
+      if (user) {
+        router.push('/dashboard')
+      } else {
+        router.push('/auth/login')
+      }
+    }, 100)
+    return () => clearTimeout(timer)
   }, [user, router])
 
   return (

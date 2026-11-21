@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { AppShell } from '../../components/AppShell'
-import { Box, Grid, Card, CardContent, Typography, Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Switch, FormControlLabel, FormControl, InputLabel, Select, MenuItem } from '@mui/material'
+import { Box, Grid, Card, CardContent, Typography, Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Switch, FormControlLabel, FormControl, InputLabel, Select, MenuItem, Alert } from '@mui/material'
 import { FileText, Plus, Edit, Trash2, Search } from 'lucide-react'
+import { useAppUser } from '../../lib/user-context'
 
 interface Item {
   id: number
@@ -17,10 +18,12 @@ interface Item {
 }
 
 export default function PlanodeContasPage() {
+  const { appUser } = useAppUser()
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(false)
   const [openDialog, setOpenDialog] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
       parent_id: null as number | null,
       nivel: 1,
@@ -31,9 +34,10 @@ export default function PlanodeContasPage() {
     })
 
   const fetchItems = async () => {
+    if (!appUser?.empresa_id) return
     setLoading(true)
     try {
-      const res = await fetch('/api/plano-contas')
+      const res = await fetch(`/api/plano-contas?empresa_id=${appUser.empresa_id}`)
       const data = await res.json()
       if (data.success) {
         setItems(data.data || [])
@@ -47,16 +51,21 @@ export default function PlanodeContasPage() {
 
   useEffect(() => {
     fetchItems()
-  }, [])
+  }, [appUser?.empresa_id])
 
   const handleCreate = async () => {
+    setSaveError(null)
     if (!/^[a-zA-Z0-9]{10,}$/.test(formData.codigo)) {
-      alert('Código deve ter pelo menos 10 caracteres alfanuméricos')
+      setSaveError('Código deve ter pelo menos 10 caracteres alfanuméricos')
+      return
+    }
+    if (!appUser?.empresa_id) {
+      setSaveError('Usuário não vinculado a nenhuma empresa.')
       return
     }
     try {
       const method = editingId ? 'PUT' : 'POST'
-      const body = editingId ? { id: editingId, ...formData } : formData
+      const body = editingId ? { id: editingId, ...formData, empresa_id: appUser.empresa_id } : { ...formData, empresa_id: appUser.empresa_id }
       
       const res = await fetch('/api/plano-contas', {
         method,
@@ -76,9 +85,12 @@ export default function PlanodeContasPage() {
       ativo: true,
     })
         fetchItems()
+      } else {
+        setSaveError(data.error || 'Erro ao salvar plano de contas')
       }
     } catch (error) {
       console.error('Error saving plano-contas:', error)
+      setSaveError('Erro de conexão ao salvar')
     }
   }
 

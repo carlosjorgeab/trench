@@ -51,7 +51,7 @@ export default function FileUpload({ files, onFilesChange, uploadedUrls, onUploa
     for (const file of files) {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('bucket', 'anexos')
+      formData.append('bucket', 'trench')
       
       try {
         const res = await fetch('/api/upload', {

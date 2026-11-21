@@ -8,10 +8,16 @@ const supabase = createClient(
 
 export async function GET(request: NextRequest) {
   try {
-    const { data, error } = await supabase
-      .from('lancamentos')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { searchParams } = new URL(request.url)
+    const empresaId = searchParams.get('empresa_id')
+
+    let query = supabase.from('lancamentos').select('*')
+
+    if (empresaId) {
+      query = query.eq('empresa_id', parseInt(empresaId))
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false })
 
     if (error) throw error
 
@@ -34,13 +40,19 @@ export async function POST(request: NextRequest) {
       .insert([body])
       .select()
 
-    if (error) throw error
+    if (error) {
+      console.error('Error creating lancamento:', error)
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      )
+    }
 
     return NextResponse.json({ success: true, data: data[0] })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating lancamento:', error)
     return NextResponse.json(
-      { success: false, error: 'Erro ao criar lançamento' },
+      { success: false, error: error?.message || 'Erro ao criar lançamento' },
       { status: 500 }
     )
   }
@@ -57,13 +69,19 @@ export async function PUT(request: NextRequest) {
       .eq('id', id)
       .select()
 
-    if (error) throw error
+    if (error) {
+      console.error('Error updating lancamento:', error)
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      )
+    }
 
     return NextResponse.json({ success: true, data: data[0] })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating lancamento:', error)
     return NextResponse.json(
-      { success: false, error: 'Erro ao atualizar lançamento' },
+      { success: false, error: error?.message || 'Erro ao atualizar lançamento' },
       { status: 500 }
     )
   }
@@ -79,13 +97,19 @@ export async function DELETE(request: NextRequest) {
       .delete()
       .eq('id', id)
 
-    if (error) throw error
+    if (error) {
+      console.error('Error deleting lancamento:', error)
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      )
+    }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting lancamento:', error)
     return NextResponse.json(
-      { success: false, error: 'Erro ao deletar lançamento' },
+      { success: false, error: error?.message || 'Erro ao deletar lançamento' },
       { status: 500 }
     )
   }

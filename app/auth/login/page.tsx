@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Box, Grid, Card, CardContent, Typography, Button, TextField, InputAdornment,
   IconButton, FormControlLabel, Checkbox, Divider, Alert, CircularProgress,
@@ -17,8 +17,9 @@ import { useSupabase } from '../../lib/supabase-context'
 import { useAppUser } from '../../lib/user-context'
 import { useThemeConfig } from '../../lib/theme-config-context'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { supabase, refreshUser } = useSupabase()
   const { refreshAppUser } = useAppUser()
   const { config, toggleMode } = useThemeConfig()
@@ -32,6 +33,25 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+
+  // Handle URL query params from OAuth callback
+  useEffect(() => {
+    const info = searchParams.get('info')
+    const error = searchParams.get('error')
+    
+    if (info === 'solicitacao_criada') {
+      setSuccessMessage('Solicitação de cadastro criada! Aguarde a aprovação do administrador.')
+      setModeTab('register')
+    } else if (info === 'solicitacao_pendente') {
+      setErrorMessage('Sua solicitação de cadastro está pendente de aprovação. Aguarde o administrador aprovar.')
+    } else if (error === 'conta_inativa') {
+      setErrorMessage('Sua conta está inativa. Entre em contato com o administrador.')
+    } else if (error === 'solicitacao_rejeitada') {
+      setErrorMessage('Sua solicitação de cadastro foi rejeitada. Entre em contato com o administrador.')
+    } else if (error === 'oauth_failed') {
+      setErrorMessage('Falha na autenticação com Google. Tente novamente.')
+    }
+  }, [searchParams])
 
   // Pré-cadastro da empresa
   const [regForm, setRegForm] = useState({
@@ -68,7 +88,77 @@ export default function LoginPage() {
       const appUser = await refreshAppUser(authUser.id)
 
       if (!appUser) {
+        // Verificar se o usuário existe na tabela usuarios mas a empresa está inativa
+        const { data: userCheck } = await supabase
+          .from('usuarios')
+          .select('id, empresa_id')
+          .eq('id', authUser.id)
+          .maybeSingle()
+
+        if (userCheck) {
+          // Busca a empresa separadamente
+          let empresaAtiva = false
+          if (userCheck.empresa_id) {
+            const { data: empresaData } = await supabase
+              .from('empresas')
+              .select('ativo')
+              .eq('id', userCheck.empresa_id)
+              .maybeSingle()
+            empresaAtiva = empresaData?.ativo === true
+          }
+          
+          if (userCheck.empresa_id && !empresaAtiva) {
+            throw new Error('A empresa vinculada ao seu usuário está inativa. Entre em contato com o administrador para reativar a empresa.')
+          }
+          
+          if (!userCheck.empresa_id) {
+            throw new Error('Seu usuário não está vinculado a nenhuma empresa. Entre em contato com o administrador.')
+          }
+        }
+
         // Usuário autenticado no Supabase mas não cadastrado na tabela usuarios
+        // Verificar se há solicitação pendente/aprovada para este email
+        const { data: solicitation } = await supabase
+          .from('solicitacoes_empresa')
+          .select('id, status, empresa_id, user_id')
+          .eq('email', authUser.email)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (solicitation) {
+          if (solicitation.status === 'aprovado' && solicitation.empresa_id) {
+            // Criar usuário vinculado à empresa aprovada
+            await supabase
+              .from('usuarios')
+              .insert([{
+                id: authUser.id,
+                email: authUser.email,
+                nome: authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Usuário',
+                empresa_id: solicitation.empresa_id,
+                perfil: 'usuario',
+                ativo: true,
+              }])
+
+            // Atualizar solicitação com user_id
+            if (!solicitation.user_id) {
+              await supabase
+                .from('solicitacoes_empresa')
+                .update({ user_id: authUser.id })
+                .eq('id', solicitation.id)
+            }
+
+            await refreshAppUser(authUser.id)
+            await refreshUser()
+            router.push('/dashboard')
+            return
+          } else if (solicitation.status === 'pendente') {
+            throw new Error('Sua solicitação de cadastro está pendente de aprovação. Aguarde o administrador aprovar.')
+          } else if (solicitation.status === 'rejeitado') {
+            throw new Error('Sua solicitação de cadastro foi rejeitada. Entre em contato com o administrador.')
+          }
+        }
+
         // Verificar se é um admin_sistema demo
         if (email.includes('@trench.com')) {
           await refreshUser()
@@ -83,6 +173,25 @@ export default function LoginPage() {
 
       if (!appUser.ativo) {
         throw new Error('Sua conta está inativa. Entre em contato com o administrador.')
+      }
+
+      // Se usuário não tem empresa_id, verificar solicitação aprovada
+      if (!appUser.empresa_id) {
+        const { data: solicitation } = await supabase
+          .from('solicitacoes_empresa')
+          .select('empresa_id')
+          .eq('user_id', authUser.id)
+          .eq('status', 'aprovado')
+          .maybeSingle()
+
+        if (solicitation?.empresa_id) {
+          await supabase
+            .from('usuarios')
+            .update({ empresa_id: solicitation.empresa_id })
+            .eq('id', authUser.id)
+          
+            await refreshAppUser(authUser.id)
+        }
       }
 
       await refreshUser()
@@ -137,7 +246,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined,
+          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
         },
       })
       if (error) throw error
@@ -445,5 +554,13 @@ export default function LoginPage() {
         </Grid>
       </Card>
     </Box>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress /></Box>}>
+      <LoginContent />
+    </Suspense>
   )
 }

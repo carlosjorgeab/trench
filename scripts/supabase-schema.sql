@@ -9,6 +9,26 @@ CREATE TABLE IF NOT EXISTS empresas (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Tabela de Solicitações de Empresa
+CREATE TABLE IF NOT EXISTS solicitacoes_empresa (
+    id SERIAL PRIMARY KEY,
+    razao_social VARCHAR(255) NOT NULL,
+    nome_fantasia VARCHAR(255),
+    cnpj VARCHAR(20),
+    email VARCHAR(255) NOT NULL,
+    telefone VARCHAR(50),
+    responsavel VARCHAR(255) NOT NULL,
+    cargo_responsavel VARCHAR(100),
+    tipo_empresa VARCHAR(50) DEFAULT 'filial',
+    mensagem TEXT,
+    status VARCHAR(20) DEFAULT 'pendente' CHECK (status IN ('pendente', 'aprovado', 'rejeitado')),
+    observacao_admin TEXT,
+    user_id UUID REFERENCES auth.users(id),
+    empresa_id INTEGER REFERENCES empresas(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Tabela de Lancamentos
 CREATE TABLE IF NOT EXISTS lancamentos (
     id SERIAL PRIMARY KEY,
@@ -111,6 +131,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     empresa_id INTEGER REFERENCES empresas(id),
     nome VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
+    perfil VARCHAR(50) DEFAULT 'usuario' CHECK (perfil IN ('admin_sistema', 'admin_empresa', 'gestor', 'analista', 'usuario')),
     ativo BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT NOW()
 );

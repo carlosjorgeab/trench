@@ -8,10 +8,16 @@ const supabase = createClient(
 
 export async function GET(request: NextRequest) {
   try {
-    const { data, error } = await supabase
-      .from('clientes')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { searchParams } = new URL(request.url)
+    const empresaId = searchParams.get('empresa_id')
+
+    let query = supabase.from('clientes').select('*')
+
+    if (empresaId) {
+      query = query.eq('empresa_id', parseInt(empresaId))
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false })
 
     if (error) throw error
 

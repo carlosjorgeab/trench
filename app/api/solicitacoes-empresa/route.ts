@@ -13,12 +13,11 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('solicitacoes_empresa')
-      .select('*')
-      .order('created_at', { ascending: false })
+      .select('*, empresas(nome)')
 
     if (status) query = (query as any).eq('status', status)
 
-    const { data, error } = await query
+    const { data, error } = await query.order('created_at', { ascending: false })
     if (error) throw error
     return NextResponse.json({ success: true, data })
   } catch {
@@ -33,6 +32,7 @@ export async function POST(request: NextRequest) {
       .from('solicitacoes_empresa')
       .insert([{ ...body, status: 'pendente' }])
       .select()
+
     if (error) throw error
     return NextResponse.json({ success: true, data: data[0] })
   } catch (error: any) {
@@ -59,19 +59,43 @@ export async function PATCH(request: NextRequest) {
     // Se aprovado, criar a empresa automaticamente
     if (status === 'aprovado' && data[0]) {
       const sol = data[0]
-      const { error: empError } = await supabase.from('empresas').insert([{
-        nome: sol.razao_social,
-        cnpj: sol.cnpj,
-        email: sol.email,
-        telefone: sol.telefone,
-        tipo: sol.tipo_empresa || 'filial',
-        ativo: true,
-      }])
-      if (empError) console.error('Erro ao criar empresa após aprovação:', empError)
-      
-      // Atualiza o usuário com o ID da empresa criada
-      const empresaId = sol.id  // Assuming the empresa table has an id column
-      await supabase.from('usuarios').update({ empresa_id: empresaId }).eq('id', sol.user_id)
+
+      // Criar a empresa
+      const { data: empresaData, error: empError } = await supabase
+        .from('empresas')
+        .insert([{
+          nome: sol.razao_social,
+          cnpj: sol.cnpj,
+          email: sol.email,
+          telefone: sol.telefone,
+          tipo: sol.tipo_empresa || 'filial',
+          ativo: true,
+        }])
+        .select()
+
+      if (empError) {
+        console.error('Erro ao criar empresa após aprovação:', empError)
+        return NextResponse.json(
+          { success: false, error: 'Erro ao criar empresa' },
+          { status: 500 }
+        )
+      }
+
+      const novaEmpresa = empresaData[0]
+
+      // Atualizar a solicitação com o ID da empresa criada
+      await supabase
+        .from('solicitacoes_empresa')
+        .update({ empresa_id: novaEmpresa.id })
+        .eq('id', id)
+
+      // Se houver user_id na solicitação, atualizar o usuário com a nova empresa
+      if (sol.user_id) {
+        await supabase
+          .from('usuarios')
+          .update({ empresa_id: novaEmpresa.id })
+          .eq('id', sol.user_id)
+      }
     }
 
     return NextResponse.json({ success: true, data: data[0] })
