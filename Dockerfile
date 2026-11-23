@@ -32,9 +32,9 @@ RUN apk add --no-cache curl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy standalone output, static assets, and production node_modules
-COPY --from=deps /app/node_modules ./node_modules
+# Copy standalone output, then production node_modules on top (so next resolves at /app/node_modules/next)
 COPY --from=builder /app/.next/standalone ./
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
