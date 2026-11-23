@@ -2,7 +2,7 @@ FROM node:20-alpine AS base
 
 WORKDIR /app
 
-# Install dependencies only when needed
+# Install dependencies
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json* ./
@@ -17,7 +17,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 RUN npm run build
 
-# Production image, copy all the files and run next
+# Production image
 FROM base AS runner
 WORKDIR /app
 
@@ -33,19 +33,14 @@ RUN apk add --no-cache curl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy public assets
+# Copy package.json, production dependencies, public assets, and built .next
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["npm", "start"]
