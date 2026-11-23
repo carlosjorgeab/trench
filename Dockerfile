@@ -24,6 +24,7 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+ENV PATH="/app/node_modules/.bin:$PATH"
 
 # Install curl for healthcheck
 RUN apk add --no-cache curl
@@ -32,7 +33,8 @@ RUN apk add --no-cache curl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy production dependencies, public assets, and built .next
+# Copy package.json, production dependencies, public assets, and built .next
+COPY --from=builder /app/package.json ./package.json
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
@@ -41,4 +43,4 @@ USER nextjs
 
 EXPOSE 3000
 
-CMD ["node_modules/.bin/next", "start"]
+CMD ["node", "node_modules/next/dist/bin/next", "start"]
