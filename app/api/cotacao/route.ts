@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
+export const dynamic = 'force-dynamic'
 const EXCHANGE_RATE_API_KEY = process.env.EXCHANGE_RATE_API_KEY || ''
 const API_URL = `https://api.exchangerate-api.com/v4/latest/BRL`
 
