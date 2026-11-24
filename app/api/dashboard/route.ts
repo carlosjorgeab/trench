@@ -1,0 +1,286 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_KEY || ''
+)
+
+async function getEmpresaId(request: NextRequest): Promise<number | null> {
+  const { searchParams } = new URL(request.url)
+  const empresaId = searchParams.get('empresa_id')
+  if (empresaId) return parseInt(empresaId)
+
+  const userId = searchParams.get('user_id')
+  if (userId) {
+    const { data: user } = await supabase
+      .from('usuarios')
+      .select('empresa_id')
+      .eq('id', userId)
+      .maybeSingle()
+    return user?.empresa_id || null
+  }
+  return null
+}
+
+async function getFinancialSummary(empresaId: number) {
+  const { data: lancamentos, error } = await supabase
+    .from('lancamentos')
+    .select('tipo, valor_principal, juros, acrecimos, status, data_lancamento, data_vencimento')
+    .eq('empresa_id', empresaId)
+
+  if (error) throw error
+
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+
+  let saldoTotal = 0
+  let receitasMes = 0
+  let despesasMes = 0
+  let contasPagar = 0
+  let contasPagarQtd = 0
+  let contasReceber = 0
+  let contasReceberQtd = 0
+  let inadimplencia = 0
+
+  for (const l of lancamentos || []) {
+    const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
+    const dataLanc = new Date(l.data_lancamento)
+    const dataVenc = new Date(l.data_vencimento)
+    const isCurrentMonth = dataLanc >= startOfMonth && dataLanc <= endOfMonth
+
+    if (l.tipo === 'credito') {
+      saldoTotal += valorTotal
+      if (isCurrentMonth) receitasMes += valorTotal
+      if (l.status === 'pendente' || l.status === 'agendado') {
+        contasReceber += valorTotal
+        contasReceberQtd++
+        if (dataVenc < now && l.status === 'pendente') {
+          inadimplencia += valorTotal
+        }
+      }
+    } else {
+      saldoTotal -= valorTotal
+      if (isCurrentMonth) despesasMes += valorTotal
+      if (l.status === 'pendente' || l.status === 'agendado') {
+        contasPagar += valorTotal
+        contasPagarQtd++
+      }
+    }
+  }
+
+  const lucroLiquido = receitasMes - despesasMes
+  const margemLiquida = receitasMes > 0 ? ((lucroLiquido / receitasMes) * 100) : 0
+  const inadimplenciaPct = contasReceber > 0 ? ((inadimplencia / contasReceber) * 100) : 0
+
+  return {
+    saldoTotal,
+    receitasMes,
+    despesasMes,
+    lucroLiquido,
+    margemLiquida: Number(margemLiquida.toFixed(1)),
+    contasPagar,
+    contasPagarQtd,
+    contasReceber,
+    contasReceberQtd,
+    inadimplencia: Number(inadimplenciaPct.toFixed(1)),
+  }
+}
+
+async function getBankAccounts(empresaId: number) {
+  const { data, error } = await supabase
+    .from('contas')
+    .select('id, nome, tipo, ativo, created_at')
+    .eq('empresa_id', empresaId)
+    .eq('ativo', true)
+
+  if (error) throw error
+
+  return (data || []).map((conta, index) => {
+    const colors = ['#ea580c', '#dc2626', '#b91c1c', '#0284c7', '#059669', '#7c3aed']
+    const badges = ['Principal', 'Investimento', 'Operacional', 'Caixa', 'Poupança', 'Outros']
+    return {
+      id: conta.id,
+      name: conta.nome,
+      type: conta.tipo || 'Conta Corrente',
+      agency: '',
+      account: '',
+      balance: 0,
+      color: colors[index % colors.length],
+      badge: badges[index % badges.length],
+    }
+  })
+}
+
+async function getCashFlowHistory(empresaId: number) {
+  const { data: lancamentos, error } = await supabase
+    .from('lancamentos')
+    .select('tipo, valor_principal, juros, acrecimos, data_lancamento')
+    .eq('empresa_id', empresaId)
+
+  if (error) throw error
+
+  const monthlyData: Record<string, { receitas: number; despesas: number }> = {}
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+  for (const l of lancamentos || []) {
+    const date = new Date(l.data_lancamento)
+    const key = `${months[date.getMonth()]}/${date.getFullYear()}`
+    const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
+
+    if (!monthlyData[key]) {
+      monthlyData[key] = { receitas: 0, despesas: 0 }
+    }
+
+    if (l.tipo === 'credito') {
+      monthlyData[key].receitas += valorTotal
+    } else {
+      monthlyData[key].despesas += valorTotal
+    }
+  }
+
+  const sortedKeys = Object.keys(monthlyData).sort((a, b) => {
+    const [ma, ya] = a.split('/')
+    const [mb, yb] = b.split('/')
+    return parseInt(ya) * 12 + months.indexOf(ma) - (parseInt(yb) * 12 + months.indexOf(mb))
+  })
+
+  return sortedKeys.slice(-6).map((mes) => ({
+    mes: mes.split('/')[0],
+    receitas: monthlyData[mes].receitas,
+    despesas: monthlyData[mes].despesas,
+  }))
+}
+
+async function getCategoryExpenses(empresaId: number) {
+  const { data: lancamentos, error } = await supabase
+    .from('lancamentos')
+    .select('valor_principal, juros, acrecimos, categorias(nome)')
+    .eq('empresa_id', empresaId)
+    .eq('tipo', 'debito')
+
+  if (error) throw error
+
+  const categoryMap: Record<string, number> = {}
+  let total = 0
+
+  for (const l of lancamentos || []) {
+    const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
+    const catName = (l.categorias as any)?.nome || 'Sem Categoria'
+    categoryMap[catName] = (categoryMap[catName] || 0) + valorTotal
+    total += valorTotal
+  }
+
+  const colors = [
+    '#3b82f6',
+    '#14b8a6',
+    '#0284c7', '#d97706', '#dc2626', '#7c3aed', '#ec4899', '#059669'
+  ]
+
+  return Object.entries(categoryMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, valor], index) => ({
+      name,
+      valor,
+      percentual: total > 0 ? Number(((valor / total) * 100).toFixed(1)) : 0,
+      color: colors[index % colors.length],
+    }))
+}
+
+async function getRecentTransactions(empresaId: number, limit = 10) {
+  const { data, error } = await supabase
+    .from('lancamentos')
+    .select(`
+      id,
+      tipo,
+      valor_principal,
+      juros,
+      acrecimos,
+      observacao,
+      status,
+      data_lancamento,
+      categorias(nome),
+      contas(nome),
+      clientes(nome),
+      fornecedores(nome)
+    `)
+    .eq('empresa_id', empresaId)
+    .order('data_lancamento', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+
+  return (data || []).map((l) => {
+    const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
+    const date = new Date(l.data_lancamento)
+    const today = new Date()
+    const isToday = date.toDateString() === today.toDateString()
+    const isYesterday = date.toDateString() === new Date(today.getTime() - 86400000).toDateString()
+
+    let dataStr = ''
+    if (isToday) dataStr = `Hoje, ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+    else if (isYesterday) dataStr = `Ontem, ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+    else dataStr = date.toLocaleDateString('pt-BR')
+
+    const cat = (l.categorias as any)?.nome || 'Sem Categoria'
+    const conta = (l.contas as any)?.nome || 'Conta não informada'
+    const cliente = (l.clientes as any)?.nome
+    const fornecedor = (l.fornecedores as any)?.nome
+
+    let descricao = l.observacao || `${l.tipo === 'credito' ? 'Recebimento' : 'Pagamento'}`
+    if (cliente) descricao += ` - ${cliente}`
+    if (fornecedor) descricao += ` - ${fornecedor}`
+
+    return {
+      id: l.id,
+      descricao,
+      categoria: cat,
+      conta,
+      data: dataStr,
+      valor: valorTotal,
+      tipo: l.tipo === 'credito' ? 'receita' : 'despesa',
+      status: l.status === 'pago' || l.status === 'recebido' ? 'Concluído' : 
+              l.status === 'agendado' ? 'Agendado' : 'Pendente',
+    }
+  })
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const empresaId = await getEmpresaId(request)
+
+    if (!empresaId) {
+      return NextResponse.json(
+        { success: false, error: 'Empresa não encontrada' },
+        { status: 400 }
+      )
+    }
+
+    const [financialSummary, bankAccounts, cashFlowHistory, categoryExpenses, recentTransactions] = await Promise.all([
+      getFinancialSummary(empresaId),
+      getBankAccounts(empresaId),
+      getCashFlowHistory(empresaId),
+      getCategoryExpenses(empresaId),
+      getRecentTransactions(empresaId),
+    ])
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        financialSummary,
+        bankAccounts,
+        cashFlowHistory,
+        categoryExpenses,
+        recentTransactions,
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error)
+    return NextResponse.json(
+      { success: false, error: 'Erro ao buscar dados do dashboard' },
+      { status: 500 }
+    )
+  }
+}

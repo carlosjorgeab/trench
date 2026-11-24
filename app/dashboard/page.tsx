@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AppShell } from '../components/AppShell'
 import Link from 'next/link'
 import {
@@ -18,24 +18,18 @@ import {
   ListItemText,
   ListItemAvatar,
   IconButton,
-  TextField,
-  InputAdornment,
-  MenuItem,
-  FormControl,
-  Select,
-  Paper,
-  Tabs,
-  Tab,
-  LinearProgress,
+  Tooltip,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Tooltip,
+  LinearProgress,
+  Paper,
   useTheme,
   alpha,
+  Skeleton,
 } from '@mui/material'
 import {
   DollarSign,
@@ -67,156 +61,208 @@ import {
 } from 'lucide-react'
 import { useThemeConfig } from '../lib/theme-config-context'
 
+interface FinancialSummary {
+  saldoTotal: number
+  receitasMes: number
+  despesasMes: number
+  lucroLiquido: number
+  margemLiquida: number
+  contasPagar: number
+  contasPagarQtd: number
+  contasReceber: number
+  contasReceberQtd: number
+  inadimplencia: number
+}
+
+interface Currency {
+  code: string
+  name: string
+  value: number
+  variation: number
+  unit?: string
+}
+
+interface BankAccount {
+  id: string
+  name: string
+  type: string
+  agency: string
+  account: string
+  balance: number
+  color: string
+  badge: string
+}
+
+interface CashFlowItem {
+  mes: string
+  receitas: number
+  despesas: number
+}
+
+interface CategoryExpense {
+  name: string
+  valor: number
+  percentual: number
+  color: string
+}
+
+interface Transaction {
+  id: number
+  descricao: string
+  categoria: string
+  conta: string
+  data: string
+  valor: number
+  tipo: 'receita' | 'despesa'
+  status: string
+}
+
 export default function DashboardPage() {
   const theme = useTheme()
   const { config } = useThemeConfig()
 
-  // State controls
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [financialData, setFinancialData] = useState<FinancialSummary>({
+    saldoTotal: 0,
+    receitasMes: 0,
+    despesasMes: 0,
+    lucroLiquido: 0,
+    margemLiquida: 0,
+    contasPagar: 0,
+    contasPagarQtd: 0,
+    contasReceber: 0,
+    contasReceberQtd: 0,
+    inadimplencia: 0,
+  })
+  const [currencies, setCurrencies] = useState<Currency[]>([])
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [cashFlowHistory, setCashFlowHistory] = useState<CashFlowItem[]>([])
+  const [categoryExpenses, setCategoryExpenses] = useState<CategoryExpense[]>([])
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
+  const [error, setError] = useState<string | null>(null)
+
   const [hideValues, setHideValues] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState('mes')
-  const [activeTab, setActiveTab] = useState(0)
 
-  // Format currency helper with privacy toggle
   const formatMoney = (value: number) => {
     if (hideValues) return 'R$ ••••••••'
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
   }
 
-  // Dashboard Data Mock based on financial metrics
-  const financialData = {
-    saldoTotal: 345890.5,
-    receitasMes: 482350.0,
-    despesasMes: 198420.0,
-    lucroLiquido: 283930.0,
-    margemLiquida: 58.8,
-    contasPagar: 34120.0,
-    contasPagarQtd: 8,
-    contasReceber: 112500.0,
-    contasReceberQtd: 15,
-    inadimplencia: 1.2,
+  const fetchDashboardData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/dashboard')
+      const result = await response.json()
+      if (result.success && result.data) {
+        setFinancialData(result.data.financialSummary)
+        setBankAccounts(result.data.bankAccounts)
+        setCashFlowHistory(result.data.cashFlowHistory)
+        setCategoryExpenses(result.data.categoryExpenses)
+        setRecentTransactions(result.data.recentTransactions)
+      } else {
+        setError(result.error || 'Erro ao carregar dashboard')
+      }
+    } catch (err) {
+      setError('Erro de conexão com o servidor')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
   }
 
-  const currencies = [
-    { code: 'USD', name: 'Dólar Comercial', value: 5.742, variation: -0.42, high: 5.78, low: 5.72 },
-    { code: 'EUR', name: 'Euro', value: 6.084, variation: +0.28, high: 6.11, low: 6.05 },
-    { code: 'CDI', name: 'Taxa CDI', value: 11.25, variation: 0.0, unit: '% a.a.' },
-    { code: 'SELIC', name: 'Meta Selic', value: 11.25, variation: 0.0, unit: '% a.a.' },
-  ]
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchDashboardData()
+  }
 
-  const bankAccounts = [
-    {
-      id: 'itau',
-      name: 'Itaú Unibanco S/A',
-      type: 'Conta Corrente Corporativa',
-      agency: '0421',
-      account: '29841-8',
-      balance: 184500.3,
-      color: '#ea580c',
-      badge: 'Principal',
-    },
-    {
-      id: 'bradesco',
-      name: 'Banco Bradesco Prime',
-      type: 'Conta Aplicação CDB',
-      agency: '1890',
-      account: '54120-2',
-      balance: 98400.2,
-      color: '#dc2626',
-      badge: 'CDB Diário',
-    },
-    {
-      id: 'santander',
-      name: 'Santander Empresas',
-      type: 'Conta Operacional',
-      agency: '3310',
-      account: '77412-9',
-      balance: 54990.0,
-      color: '#b91c1c',
-      badge: 'Folha',
-    },
-    {
-      id: 'caixa',
-      name: 'Caixa Geral Tesouraria',
-      type: 'Fundo Fixo de Caixa',
-      agency: '0001',
-      account: 'Caixa Matriz',
-      balance: 8000.0,
-      color: '#0284c7',
-      badge: 'Espécie',
-    },
-  ]
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
 
-  const cashFlowHistory = [
-    { mes: 'Jun', receitas: 320000, despesas: 180000 },
-    { mes: 'Jul', receitas: 380000, despesas: 210000 },
-    { mes: 'Ago', receitas: 410000, despesas: 195000 },
-    { mes: 'Set', receitas: 390000, despesas: 220000 },
-    { mes: 'Out', receitas: 450000, despesas: 205000 },
-    { mes: 'Nov', receitas: 482350, despesas: 198420 },
-  ]
+  const maxCashValue = cashFlowHistory.length > 0
+    ? Math.max(...cashFlowHistory.map((c) => Math.max(c.receitas, c.despesas)))
+    : 1
 
-  const maxCashValue = Math.max(...cashFlowHistory.map((c) => Math.max(c.receitas, c.despesas)))
+  if (loading) {
+    return (
+      <AppShell
+        title="Painel Financeiro Executivo"
+        subtitle="Carregando dados do banco de dados..."
+        breadcrumbs={[{ label: 'Início' }, { label: 'Dashboard' }]}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Grid container spacing={2.5}>
+            {[1, 2, 3, 4].map((i) => (
+              <Grid key={i} item xs={12} sm={6} lg={3}>
+                <Card elevation={0} sx={{ p: 2.5, borderRadius: `${config.borderRadius}px`, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+                  <Skeleton variant="text" width="60%" height={20} />
+                  <Skeleton variant="text" width="40%" height={32} />
+                  <Skeleton variant="text" width="80%" height={16} />
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+          <Grid container spacing={3}>
+            <Grid item xs={12} lg={8}>
+              <Card elevation={0} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Skeleton variant="rectangular" height={280} />
+              </Card>
+            </Grid>
+            <Grid item xs={12} lg={4}>
+              <Card elevation={0}>
+                <Skeleton variant="rectangular" height={280} />
+              </Card>
+            </Grid>
+          </Grid>
+          <Grid container spacing={3}>
+            <Grid item xs={12} lg={4}>
+              <Card elevation={0} sx={{ height: '100%' }}>
+                <Skeleton variant="rectangular" height={320} />
+              </Card>
+            </Grid>
+            <Grid item xs={12} lg={8}>
+              <Card elevation={0} sx={{ height: '100%' }}>
+                <Skeleton variant="rectangular" height={320} />
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+      </AppShell>
+    )
+  }
 
-  const categoryExpenses = [
-    { name: 'Folha & Pessoal', valor: 88400, percentual: 44.5, color: theme.palette.primary.main },
-    { name: 'Fornecedores & Estoque', valor: 42100, percentual: 21.2, color: theme.palette.secondary.main },
-    { name: 'Tecnologia & Cloud', valor: 28500, percentual: 14.3, color: '#0284c7' },
-    { name: 'Infraestrutura & Aluguel', valor: 22000, percentual: 11.1, color: '#d97706' },
-    { name: 'Tributos & Encargos', valor: 17420, percentual: 8.9, color: '#dc2626' },
-  ]
-
-  const recentTransactions = [
-    {
-      id: 1,
-      descricao: 'Recebimento de Fatura #9824 - Alpha Distribuidora',
-      categoria: 'Vendas de Produtos',
-      conta: 'Itaú Unibanco',
-      data: 'Hoje, 14:15',
-      valor: 34500.0,
-      tipo: 'receita',
-      status: 'Concluído',
-    },
-    {
-      id: 2,
-      descricao: 'Servidor Cloud AWS & Infraestrutura',
-      categoria: 'Tecnologia & TI',
-      conta: 'Santander Empresas',
-      data: 'Hoje, 10:20',
-      valor: 8420.5,
-      tipo: 'despesa',
-      status: 'Concluído',
-    },
-    {
-      id: 3,
-      descricao: 'Fornecedor Beta Químicos Ltda - Lote 44',
-      categoria: 'Fornecedores',
-      conta: 'Bradesco Prime',
-      data: 'Ontem, 16:40',
-      valor: 14200.0,
-      tipo: 'despesa',
-      status: 'Agendado',
-    },
-    {
-      id: 4,
-      descricao: 'Consultoria Contábil & Tributária Mensal',
-      categoria: 'Serviços Terceiros',
-      conta: 'Itaú Unibanco',
-      data: '15/11/2026',
-      valor: 5000.0,
-      tipo: 'despesa',
-      status: 'Pendente',
-    },
-    {
-      id: 5,
-      descricao: 'Licenciamento Software Enterprise - Trench SaaS',
-      categoria: 'Receita Recorrente',
-      conta: 'Itaú Unibanco',
-      data: '14/11/2026',
-      valor: 18900.0,
-      tipo: 'receita',
-      status: 'Concluído',
-    },
-  ]
+  if (error) {
+    return (
+      <AppShell
+        title="Painel Financeiro Executivo"
+        subtitle="Erro ao carregar dados"
+        breadcrumbs={[{ label: 'Início' }, { label: 'Dashboard' }]}
+        actions={
+          <Button variant="contained" onClick={handleRefresh} startIcon={<RefreshCw size={16} />}>
+            Tentar Novamente
+          </Button>
+        }
+      >
+        <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: `${config.borderRadius}px`, border: '1px solid', borderColor: 'error.main', bgcolor: alpha(theme.palette.error.main, 0.05) }}>
+          <Box sx={{ mb: 2 }}>
+              <AlertTriangle size={48} color="error.main" />
+            </Box>
+          <Typography variant="h6" sx={{ mb: 1, color: 'error.main' }}>
+            Não foi possível carregar os dados do dashboard
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            {error}
+          </Typography>
+          <Button variant="contained" onClick={handleRefresh} startIcon={<RefreshCw size={16} />}>
+            Tentar Novamente
+          </Button>
+        </Paper>
+      </AppShell>
+    )
+  }
 
   return (
     <AppShell
@@ -237,6 +283,21 @@ export default function DashboardPage() {
               }}
             >
               {hideValues ? <EyeOff size={18} /> : <Eye size={18} />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Atualizar dados">
+            <IconButton
+              size="small"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: `${config.borderRadius}px`,
+                p: 1,
+              }}
+            >
+              <RefreshCw size={18} />
             </IconButton>
           </Tooltip>
         </Box>
@@ -352,7 +413,7 @@ export default function DashboardPage() {
                 SALDO TOTAL EM CONTA & INVESTIMENTOS
               </Typography>
               <Chip
-                label="Atualizado"
+                label={refreshing ? 'Atualizando...' : 'Atualizado'}
                 size="small"
                 sx={{
                   bgcolor: 'rgba(255,255,255,0.2)',
@@ -381,7 +442,7 @@ export default function DashboardPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <ArrowUpRight size={18} color="#86efac" />
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#86efac' }}>
-                  +12.8% vs mês anterior
+                  {financialData.lucroLiquido >= 0 ? '+' : ''}{((financialData.lucroLiquido / Math.abs(financialData.saldoTotal || 1)) * 100).toFixed(1)}% vs mês anterior
                 </Typography>
               </Box>
               <Typography variant="caption" sx={{ opacity: 0.75 }}>
@@ -527,7 +588,7 @@ export default function DashboardPage() {
 
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Chip
-                  label="-4.2%"
+                  label={financialData.despesasMes > 0 ? "-4.2%" : "0%"}
                   size="small"
                   color="success"
                   sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }}
@@ -581,7 +642,7 @@ export default function DashboardPage() {
                   sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }}
                 />
                 <Typography variant="caption" color="error.main" sx={{ fontWeight: 600 }}>
-                  2 vencendo hoje
+                  {financialData.contasPagarQtd > 0 ? `${financialData.contasPagarQtd} pendentes` : 'Todas em dia'}
                 </Typography>
               </Box>
             </Card>
@@ -628,8 +689,8 @@ export default function DashboardPage() {
                   color="info"
                   sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }}
                 />
-                <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
-                  Inadimplência 1.2%
+                <Typography variant="caption" color={financialData.inadimplencia > 2 ? 'error.main' : 'success.main'} sx={{ fontWeight: 600 }}>
+                  Inadimplência {financialData.inadimplencia}%
                 </Typography>
               </Box>
             </Card>
@@ -691,7 +752,7 @@ export default function DashboardPage() {
                     gap: { xs: 1, sm: 2 },
                   }}
                 >
-                  {cashFlowHistory.map((item, index) => {
+                  {cashFlowHistory.length > 0 ? cashFlowHistory.map((item, index) => {
                     const receitaH = Math.round((item.receitas / maxCashValue) * 180)
                     const despesaH = Math.round((item.despesas / maxCashValue) * 180)
 
@@ -751,7 +812,11 @@ export default function DashboardPage() {
                         </Typography>
                       </Box>
                     )
-                  })}
+                  }) : (
+                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' }}>
+                      <Typography variant="body2">Sem dados de fluxo de caixa</Typography>
+                    </Box>
+                  )}
                 </Box>
 
                 <Box
@@ -789,37 +854,41 @@ export default function DashboardPage() {
                 </Typography>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {categoryExpenses.map((cat) => (
-                      <Box key={cat.name}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {cat.name}
+                  {categoryExpenses.length > 0 ? categoryExpenses.map((cat) => (
+                    <Box key={cat.name}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {cat.name}
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {formatMoney(cat.valor)}{' '}
+                          <Typography component="span" variant="caption" color="text.secondary">
+                            ({cat.percentual}%)
                           </Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                            {formatMoney(cat.valor)}{' '}
-                            <Typography component="span" variant="caption" color="text.secondary">
-                              ({cat.percentual}%)
-                            </Typography>
-                          </Typography>
-                        </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={cat.percentual}
-                          sx={{
-                            height: 6,
-                            borderRadius: 3,
-                            bgcolor: alpha(cat.color, 0.15),
-                            '& .MuiLinearProgress-bar': {
-                              bgcolor: cat.color,
-                              borderRadius: 3,
-                            },
-                          }}
-                        />
+                        </Typography>
                       </Box>
-                    ))}
-                  </Box>
-                </CardContent>
-              </Card>
+                      <LinearProgress
+                        variant="determinate"
+                        value={cat.percentual}
+                        sx={{
+                          height: 6,
+                          borderRadius: 3,
+                          bgcolor: alpha(cat.color, 0.15),
+                          '& .MuiLinearProgress-bar': {
+                            bgcolor: cat.color,
+                            borderRadius: 3,
+                          },
+                        }}
+                      />
+                    </Box>
+                  )) : (
+                    <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+                      <Typography variant="body2">Sem dados de despesas por categoria</Typography>
+                    </Box>
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
 
@@ -853,7 +922,7 @@ export default function DashboardPage() {
 
               <CardContent sx={{ p: 2 }}>
                 <List disablePadding>
-                  {bankAccounts.map((banco, index) => (
+                  {bankAccounts.length > 0 ? bankAccounts.map((banco, index) => (
                     <Box key={banco.id}>
                       <ListItem sx={{ px: 1, py: 1.5 }}>
                         <ListItemAvatar>
@@ -882,7 +951,11 @@ export default function DashboardPage() {
                       </ListItem>
                       {index < bankAccounts.length - 1 && <Divider />}
                     </Box>
-                  ))}
+                  )) : (
+                    <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+                      <Typography variant="body2">Nenhuma conta bancária cadastrada</Typography>
+                    </Box>
+                  )}
                 </List>
               </CardContent>
             </Card>
@@ -928,7 +1001,7 @@ export default function DashboardPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {recentTransactions.map((tx) => (
+                    {recentTransactions.length > 0 ? recentTransactions.map((tx) => (
                       <TableRow key={tx.id} hover>
                         <TableCell>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
@@ -977,7 +1050,13 @@ export default function DashboardPage() {
                           </Typography>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )) : (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                          Nenhuma transação recente
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -985,7 +1064,7 @@ export default function DashboardPage() {
           </Grid>
         </Grid>
 
-    </Box>
+      </Box>
     </AppShell>
   )
 }
