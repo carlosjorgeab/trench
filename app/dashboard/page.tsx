@@ -60,6 +60,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { useThemeConfig } from '../lib/theme-config-context'
+import { useAppUser } from '../lib/user-context'
 
 interface FinancialSummary {
   saldoTotal: number
@@ -120,6 +121,7 @@ interface Transaction {
 export default function DashboardPage() {
   const theme = useTheme()
   const { config } = useThemeConfig()
+  const { appUser, loadingAppUser } = useAppUser()
 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -151,10 +153,15 @@ export default function DashboardPage() {
   }
 
   const fetchDashboardData = async () => {
+    if (!appUser?.empresa_id) {
+      setError('Empresa não vinculada ao usuário')
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch('/api/dashboard')
+      const response = await fetch(`/api/dashboard?user_id=${appUser.id}`)
       const result = await response.json()
       if (result.success && result.data) {
         setFinancialData(result.data.financialSummary)
@@ -179,12 +186,108 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
+    if (!loadingAppUser) {
+      fetchDashboardData()
+    }
+  }, [appUser, loadingAppUser])
 
   const maxCashValue = cashFlowHistory.length > 0
     ? Math.max(...cashFlowHistory.map((c) => Math.max(c.receitas, c.despesas)))
     : 1
+
+  // Loading user session
+  if (loadingAppUser) {
+    return (
+      <AppShell
+        title="Painel Financeiro Executivo"
+        subtitle="Verificando sessão do usuário..."
+        breadcrumbs={[{ label: 'Início' }, { label: 'Dashboard' }]}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Grid container spacing={2.5}>
+            {[1, 2, 3, 4].map((i) => (
+              <Grid key={i} item xs={12} sm={6} lg={3}>
+                <Card elevation={0} sx={{ p: 2.5, borderRadius: `${config.borderRadius}px`, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+                  <Skeleton variant="text" width="60%" height={20} />
+                  <Skeleton variant="text" width="40%" height={32} />
+                  <Skeleton variant="text" width="80%" height={16} />
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+          <Grid container spacing={3}>
+            <Grid item xs={12} lg={8}>
+              <Card elevation={0} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Skeleton variant="rectangular" height={280} />
+              </Card>
+            </Grid>
+            <Grid item xs={12} lg={4}>
+              <Card elevation={0}>
+                <Skeleton variant="rectangular" height={280} />
+              </Card>
+            </Grid>
+          </Grid>
+          <Grid container spacing={3}>
+            <Grid item xs={12} lg={4}>
+              <Card elevation={0} sx={{ height: '100%' }}>
+                <Skeleton variant="rectangular" height={320} />
+              </Card>
+            </Grid>
+            <Grid item xs={12} lg={8}>
+              <Card elevation={0} sx={{ height: '100%' }}>
+                <Skeleton variant="rectangular" height={320} />
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+      </AppShell>
+    )
+  }
+
+  // No user or no empresa linked
+  if (!appUser) {
+    return (
+      <AppShell
+        title="Painel Financeiro Executivo"
+        subtitle="Sessão não encontrada"
+        breadcrumbs={[{ label: 'Início' }, { label: 'Dashboard' }]}
+      >
+        <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: `${config.borderRadius}px`, border: '1px solid', borderColor: 'warning.main', bgcolor: alpha(theme.palette.warning.main, 0.05) }}>
+          <Box sx={{ mb: 2 }}>
+            <AlertTriangle size={48} color="warning.main" />
+          </Box>
+          <Typography variant="h6" sx={{ mb: 1, color: 'warning.main' }}>
+            Usuário não autenticado
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Faça login para acessar o dashboard financeiro.
+          </Typography>
+        </Paper>
+      </AppShell>
+    )
+  }
+
+  if (!appUser.empresa_id) {
+    return (
+      <AppShell
+        title="Painel Financeiro Executivo"
+        subtitle="Empresa não vinculada"
+        breadcrumbs={[{ label: 'Início' }, { label: 'Dashboard' }]}
+      >
+        <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: `${config.borderRadius}px`, border: '1px solid', borderColor: 'warning.main', bgcolor: alpha(theme.palette.warning.main, 0.05) }}>
+          <Box sx={{ mb: 2 }}>
+            <AlertTriangle size={48} color="warning.main" />
+          </Box>
+          <Typography variant="h6" sx={{ mb: 1, color: 'warning.main' }}>
+            Nenhuma empresa vinculada ao seu usuário
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Entre em contato com o administrador do sistema para vincular sua conta a uma empresa.
+          </Typography>
+        </Paper>
+      </AppShell>
+    )
+  }
 
   if (loading) {
     return (
