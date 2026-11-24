@@ -156,7 +156,7 @@ async function getCashFlowHistory(empresaId: number) {
 async function getCategoryExpenses(empresaId: number) {
   const { data: lancamentos, error } = await supabase
     .from('lancamentos')
-    .select('valor_principal, juros, acrecimos, categorias(nome)')
+    .select('valor_principal, juros, acrecimos, categoria_id, categorias!inner(nome)')
     .eq('empresa_id', empresaId)
     .eq('tipo', 'debito')
 
@@ -167,7 +167,8 @@ async function getCategoryExpenses(empresaId: number) {
 
   for (const l of lancamentos || []) {
     const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
-    const catName = (l.categorias as any)?.nome || 'Sem Categoria'
+    // Access the joined category name
+    const catName = (l as any).categorias?.nome || 'Sem Categoria'
     categoryMap[catName] = (categoryMap[catName] || 0) + valorTotal
     total += valorTotal
   }
@@ -201,10 +202,14 @@ async function getRecentTransactions(empresaId: number, limit = 10) {
       observacao,
       status,
       data_lancamento,
-      categorias(nome),
-      contas(nome),
-      clientes(nome),
-      fornecedores(nome)
+      categoria_id,
+      categorias!inner(nome),
+      conta_id,
+      contas!inner(nome),
+      cliente_id,
+      clientes!inner(nome),
+      fornecedor_id,
+      fornecedores!inner(nome)
     `)
     .eq('empresa_id', empresaId)
     .order('data_lancamento', { ascending: false })
@@ -224,10 +229,10 @@ async function getRecentTransactions(empresaId: number, limit = 10) {
     else if (isYesterday) dataStr = `Ontem, ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
     else dataStr = date.toLocaleDateString('pt-BR')
 
-    const cat = (l.categorias as any)?.nome || 'Sem Categoria'
-    const conta = (l.contas as any)?.nome || 'Conta não informada'
-    const cliente = (l.clientes as any)?.nome
-    const fornecedor = (l.fornecedores as any)?.nome
+    const cat = (l as any).categorias?.nome || 'Sem Categoria'
+    const conta = (l as any).contas?.nome || 'Conta não informada'
+    const cliente = (l as any).clientes?.nome
+    const fornecedor = (l as any).fornecedores?.nome
 
     let descricao = l.observacao || `${l.tipo === 'credito' ? 'Recebimento' : 'Pagamento'}`
     if (cliente) descricao += ` - ${cliente}`
@@ -258,28 +263,57 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Run each query independently to isolate errors
+    const financialSummaryPromise = getFinancialSummary(empresaId).catch((e) => {
+      console.error('getFinancialSummary error:', e)
+      return null
+    })
+    const bankAccountsPromise = getBankAccounts(empresaId).catch((e) => {
+      console.error('getBankAccounts error:', e)
+      return []
+    })
+    const cashFlowHistoryPromise = getCashFlowHistory(empresaId).catch((e) => {
+      console.error('getCashFlowHistory error:', e)
+      return []
+    })
+    const categoryExpensesPromise = getCategoryExpenses(empresaId).catch((e) => {
+      console.error('getCategoryExpenses error:', e)
+      return []
+    })
+    const recentTransactionsPromise = getRecentTransactions(empresaId).catch((e) => {
+      console.error('getRecentTransactions error:', e)
+      return []
+    })
+
     const [financialSummary, bankAccounts, cashFlowHistory, categoryExpenses, recentTransactions] = await Promise.all([
-      getFinancialSummary(empresaId),
-      getBankAccounts(empresaId),
-      getCashFlowHistory(empresaId),
-      getCategoryExpenses(empresaId),
-      getRecentTransactions(empresaId),
+      financialSummaryPromise,
+      bankAccountsPromise,
+      cashFlowHistoryPromise,
+      categoryExpensesPromise,
+      recentTransactionsPromise,
     ])
+
+    if (!financialSummary) {
+      return NextResponse.json(
+        { success: false, error: 'Erro ao calcular resumo financeiro' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({
       success: true,
       data: {
         financialSummary,
-        bankAccounts,
-        cashFlowHistory,
-        categoryExpenses,
-        recentTransactions,
+        bankAccounts: bankAccounts || [],
+        cashFlowHistory: cashFlowHistory || [],
+        categoryExpenses: categoryExpenses || [],
+        recentTransactions: recentTransactions || [],
       }
     })
   } catch (error) {
     console.error('Error fetching dashboard data:', error)
     return NextResponse.json(
-      { success: false, error: 'Erro ao buscar dados do dashboard' },
+      { success: false, error: 'Erro ao buscar dados do dashboard', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }
