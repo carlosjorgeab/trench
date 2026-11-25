@@ -6,6 +6,7 @@ import { ThemeConfigProvider } from './lib/theme-config-context'
 import { ThemeProvider } from './lib/theme-context'
 import { AppThemeProvider } from './lib/app-theme-provider'
 import { UserProvider } from './lib/user-context'
+import { SingleSessionProvider } from './lib/single-session-provider'
 import './globals.css'
 
 interface RootLayoutProps {
@@ -30,7 +31,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
             <AppThemeProvider>
               <SupabaseProvider>
                 <UserProvider>
-                  {children}
+                  <SingleSessionProvider>
+                    {children}
+                  </SingleSessionProvider>
                 </UserProvider>
               </SupabaseProvider>
             </AppThemeProvider>

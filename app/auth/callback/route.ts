@@ -8,6 +8,42 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
+// Função para notificar administradores sobre nova solicitação
+async function notifyAdminsOfNewSolicitation(solicitationId: number, email: string, razaoSocial: string) {
+  try {
+    // Buscar administradores do sistema
+    const { data: admins } = await supabaseAdmin
+      .from('usuarios')
+      .select('id, email, nome')
+      .in('perfil', ['admin_sistema', 'admin_empresa'])
+      .eq('ativo', true)
+
+    if (admins && admins.length > 0) {
+      // Em produção, aqui enviaria e-mail ou criaria notificação no banco
+      console.log('[NOTIFICAÇÃO ADMIN] Nova solicitação de empresa via Google OAuth:', {
+        solicitationId,
+        email,
+        razaoSocial,
+        adminsNotified: admins.map(a => a.email),
+        timestamp: new Date().toISOString(),
+      })
+
+      // TODO: Implementar envio de e-mail real ou inserção em tabela de notificações
+      // Exemplo para futuro:
+      // await supabaseAdmin.from('notificacoes').insert(admins.map(a => ({
+      //   usuario_id: a.id,
+      //   tipo: 'nova_solicitacao_empresa',
+      //   titulo: 'Nova solicitação de empresa via Google',
+      //   mensagem: `Uma nova solicitação de empresa foi criada via Google OAuth: ${razaoSocial} (${email})`,
+      //   dados: { solicitationId, email, razaoSocial },
+      //   lida: false,
+      // })))
+    }
+  } catch (error) {
+    console.error('Erro ao notificar administradores:', error)
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
@@ -97,7 +133,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // No solicitation exists - create a pre-registration (solicitacao_empresa)
+      // No solicitation exists - create a pre-registration (solicitacao_empresa) for Google OAuth
       const { data: newSolicitation } = await supabaseAdmin
         .from('solicitacoes_empresa')
         .insert([{
@@ -110,6 +146,11 @@ export async function GET(request: NextRequest) {
         }])
         .select()
         .maybeSingle()
+
+      // Notificar administradores sobre nova solicitação via Google OAuth
+      if (newSolicitation) {
+        await notifyAdminsOfNewSolicitation(newSolicitation.id, authUser.email || '', newSolicitation.razao_social)
+      }
 
       return NextResponse.redirect(new URL('/auth/login?info=solicitacao_criada', request.url))
     }

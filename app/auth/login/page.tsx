@@ -7,11 +7,12 @@ import {
   IconButton, FormControlLabel, Checkbox, Divider, Alert, CircularProgress,
   Chip, Tooltip, Paper, Tabs, Tab, useTheme, alpha, MenuItem, Select,
   FormControl, InputLabel,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material'
 import {
   Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Building2,
   TrendingUp, CreditCard, Moon, Sun, User, CheckCircle2, Phone,
-  Briefcase, FileText, AlertCircle,
+  Briefcase, FileText, AlertCircle, Key, RotateCcw,
 } from 'lucide-react'
 import { useSupabase } from '../../lib/supabase-context'
 import { useAppUser } from '../../lib/user-context'
@@ -33,6 +34,12 @@ function LoginContent() {
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+
+  // Password recovery dialog state
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('')
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false)
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false)
 
   // Handle URL query params from OAuth callback
   useEffect(() => {
@@ -238,6 +245,45 @@ function LoginContent() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleForgotPassword = async () => {
+    if (!forgotPasswordEmail.trim()) {
+      setErrorMessage('Informe seu e-mail para recuperar a senha.')
+      return
+    }
+
+    setForgotPasswordLoading(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail.trim(), {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/reset-password` : undefined,
+      })
+
+      if (error) throw error
+
+      setForgotPasswordSent(true)
+      setSuccessMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada (e spam).')
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Erro ao enviar e-mail de recuperação. Tente novamente.')
+    } finally {
+      setForgotPasswordLoading(false)
+    }
+  }
+
+  const handleResendRecoveryEmail = async () => {
+    setForgotPasswordSent(false)
+    await handleForgotPassword()
+  }
+
+  const handleCloseForgotPassword = () => {
+    setForgotPasswordOpen(false)
+    setForgotPasswordEmail('')
+    setForgotPasswordSent(false)
+    setErrorMessage('')
+    setSuccessMessage('')
   }
 
   const handleGoogleLogin = async () => {
@@ -449,9 +495,19 @@ function LoginContent() {
 
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
                       <FormControlLabel control={<Checkbox size="small" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} color="primary" />} label={<Typography variant="body2">Lembrar meu acesso</Typography>} />
-                      <Typography component="a" href="#" onClick={(e) => { e.preventDefault(); alert('Solicite redefinição ao administrador ou verifique seu e-mail corporativo.') }} variant="caption" color="primary.main" sx={{ fontWeight: 600, textDecoration: 'none', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>
+                      <Button
+                        type="button"
+                        variant="text"
+                        size="small"
+                        startIcon={<Key size={14} />}
+                        onClick={() => {
+                          setForgotPasswordEmail(email)
+                          setForgotPasswordOpen(true)
+                        }}
+                        sx={{ fontWeight: 600, textTransform: 'none' }}
+                      >
                         Esqueceu a senha?
-                      </Typography>
+                      </Button>
                     </Box>
 
                     <Button type="submit" variant="contained" fullWidth disabled={loading} endIcon={!loading ? <ArrowRight size={18} /> : null} sx={{ py: 1.25, fontSize: '0.95rem', fontWeight: 700, mt: 1 }}>
@@ -549,10 +605,112 @@ function LoginContent() {
                   <Typography component="span" variant="caption" color="primary.main" sx={{ cursor: 'pointer' }}>Privacidade</Typography>.
                 </Typography>
               </Box>
-            </CardContent>
-          </Grid>
-        </Grid>
-      </Card>
+</CardContent>
+           </Grid>
+         </Grid>
+
+         {/* Password Recovery Dialog */}
+         <Dialog
+           open={forgotPasswordOpen}
+           onClose={handleCloseForgotPassword}
+           maxWidth="sm"
+           fullWidth
+           PaperProps={{ sx: { borderRadius: `${config.borderRadius}px` } }}
+         >
+           <DialogTitle sx={{ fontWeight: 700 }}>
+             {forgotPasswordSent ? 'E-mail Enviado!' : 'Recuperar Senha'}
+           </DialogTitle>
+           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+             {!forgotPasswordSent ? (
+               <>
+                 <Typography variant="body2" color="text.secondary">
+                   Informe seu e-mail corporativo para receber um link de redefinição de senha.
+                 </Typography>
+                 <TextField
+                   fullWidth
+                   size="small"
+                   label="E-mail Corporativo *"
+                   type="email"
+                   placeholder="usuario@empresa.com.br"
+                   value={forgotPasswordEmail}
+                   onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                   required
+                   InputProps={{
+                     startAdornment: <InputAdornment position="start"><Mail size={18} color={theme.palette.text.secondary} /></InputAdornment>,
+                   }}
+                 />
+                 <Alert severity="info" sx={{ mt: 1 }}>
+                   <Typography variant="caption">
+                     O link de recuperação expira em 24 horas. Verifique também a pasta de spam.
+                   </Typography>
+                 </Alert>
+               </>
+             ) : (
+               <>
+                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 2 }}>
+                   <Box
+                     sx={{
+                       width: 64,
+                       height: 64,
+                       borderRadius: '50%',
+                       bgcolor: 'success.light',
+                       color: 'success.main',
+                       display: 'flex',
+                       alignItems: 'center',
+                       justifyContent: 'center',
+                     }}
+                   >
+                     <CheckCircle2 size={32} />
+                   </Box>
+                   <Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>
+                     E-mail de recuperação enviado!
+                   </Typography>
+                   <Typography variant="body2" color="text.secondary" textAlign="center">
+                     Enviamos um link de redefinição de senha para <strong>{forgotPasswordEmail}</strong>.
+                     Verifique sua caixa de entrada (e a pasta de spam).
+                   </Typography>
+                 </Box>
+                 <Alert severity="info">
+                   <Typography variant="caption">
+                     O link expira em 24 horas. Se não receber o e-mail em alguns minutos, tente novamente.
+                   </Typography>
+                 </Alert>
+               </>
+             )}
+           </DialogContent>
+           <DialogActions sx={{ p: 2, pt: 0, justifyContent: 'flex-end' }}>
+             {!forgotPasswordSent ? (
+               <>
+                 <Button onClick={handleCloseForgotPassword} disabled={forgotPasswordLoading}>Cancelar</Button>
+                 <Button
+                   variant="contained"
+                   startIcon={<RotateCcw size={16} />}
+                   onClick={handleForgotPassword}
+                   disabled={forgotPasswordLoading || !forgotPasswordEmail.trim()}
+                 >
+                   {forgotPasswordLoading ? (
+                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                       <CircularProgress size={16} color="inherit" />
+                       <span>Enviando...</span>
+                     </Box>
+                   ) : (
+                     'Enviar Link de Recuperação'
+                   )}
+                 </Button>
+               </>
+             ) : (
+               <>
+                 <Button variant="outlined" onClick={handleResendRecoveryEmail} disabled={forgotPasswordLoading}>
+                   Reenviar E-mail
+                 </Button>
+                 <Button variant="contained" onClick={handleCloseForgotPassword}>
+                   Fechar
+                 </Button>
+               </>
+             )}
+           </DialogActions>
+         </Dialog>
+       </Card>
     </Box>
   )
 }

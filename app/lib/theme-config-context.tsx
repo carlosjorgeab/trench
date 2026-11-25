@@ -20,6 +20,8 @@ export interface ThemeConfig {
   spacingUnit: number
   borderRadius: number
   presetName: string
+  sessionTimeoutMinutes: number
+  enableSingleSession: boolean
 }
 
 export interface ThemePresets {
@@ -52,6 +54,8 @@ export const THEME_PRESETS: ThemePresets = {
       spacingUnit: 8,
       borderRadius: 8,
       presetName: 'catppuccin',
+      sessionTimeoutMinutes: 60,
+      enableSingleSession: true,
     },
   },
   material: {
@@ -75,6 +79,8 @@ export const THEME_PRESETS: ThemePresets = {
       spacingUnit: 8,
       borderRadius: 10,
       presetName: 'material',
+      sessionTimeoutMinutes: 60,
+      enableSingleSession: true,
     },
   },
   emerald: {
@@ -98,6 +104,8 @@ export const THEME_PRESETS: ThemePresets = {
       spacingUnit: 8,
       borderRadius: 8,
       presetName: 'emerald',
+      sessionTimeoutMinutes: 60,
+      enableSingleSession: true,
     },
   },
   purple: {
@@ -121,6 +129,8 @@ export const THEME_PRESETS: ThemePresets = {
       spacingUnit: 8,
       borderRadius: 12,
       presetName: 'purple',
+      sessionTimeoutMinutes: 60,
+      enableSingleSession: true,
     },
   },
   sunset: {
@@ -144,6 +154,8 @@ export const THEME_PRESETS: ThemePresets = {
       spacingUnit: 8,
       borderRadius: 8,
       presetName: 'sunset',
+      sessionTimeoutMinutes: 60,
+      enableSingleSession: true,
     },
   },
   dark: {
@@ -167,6 +179,8 @@ export const THEME_PRESETS: ThemePresets = {
       spacingUnit: 8,
       borderRadius: 10,
       presetName: 'dark',
+      sessionTimeoutMinutes: 60,
+      enableSingleSession: true,
     },
   },
 }
@@ -189,6 +203,8 @@ export const defaultThemeConfig: ThemeConfig = {
   spacingUnit: 8,
   borderRadius: 8,
   presetName: 'material',
+  sessionTimeoutMinutes: 60,
+  enableSingleSession: true,
 }
 
 interface ThemeConfigContextType {

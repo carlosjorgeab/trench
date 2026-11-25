@@ -33,6 +33,8 @@ import {
   TableRow,
   useTheme,
   alpha,
+  InputAdornment,
+  Switch,
 } from '@mui/material'
 import { useThemeConfig, THEME_PRESETS, ThemeConfig } from '../lib/theme-config-context'
 import {
@@ -51,6 +53,9 @@ import {
   Sliders,
   DollarSign,
   TrendingUp,
+  Shield,
+  Clock,
+  UserCheck,
 } from 'lucide-react'
 
 export default function ConfiguracaoPage() {
@@ -228,6 +233,7 @@ export default function ConfiguracaoPage() {
                   <Tab icon={<Palette size={18} />} iconPosition="start" label="Cores Customizadas" />
                   <Tab icon={<Type size={18} />} iconPosition="start" label="Fontes" />
                   <Tab icon={<LayoutGrid size={18} />} iconPosition="start" label="Espaçamento & Bordas" />
+                  <Tab icon={<Shield size={18} />} iconPosition="start" label="Sessão & Segurança" />
                 </Tabs>
               </Box>
 
@@ -611,6 +617,186 @@ export default function ConfiguracaoPage() {
                           updateConfig({ spacingUnit: num, presetName: 'custom' })
                         }}
                       />
+                    </Box>
+                  </Box>
+                )}
+
+                {/* ABA 4: Sessão & Segurança */}
+                {activeTab === 4 && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                        Configurações de Sessão e Segurança
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Configure o tempo de expiração da sessão e políticas de acesso simultâneo.
+                      </Typography>
+                    </Box>
+
+                    <Divider />
+
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}><Clock size={20} /></Box> Tempo de Expiração da Sessão
+                      </Typography>
+
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: `${config.borderRadius}px`,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: 2,
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 200, flex: 1 }}>
+                            <Box
+                              sx={{
+                                p: 1,
+                                borderRadius: '50%',
+                                bgcolor: alpha(theme.palette.info.main, 0.1),
+                                color: 'info.main',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Clock size={24} />
+                            </Box>
+                            <Box>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                Tempo limite de inatividade
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Após este período sem atividade, o usuário será desconectado automaticamente
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <TextField
+                              type="number"
+                              size="small"
+                              value={localConfig.sessionTimeoutMinutes}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 1
+                                setLocalConfig({ ...localConfig, sessionTimeoutMinutes: val, presetName: 'custom' })
+                                updateConfig({ sessionTimeoutMinutes: val, presetName: 'custom' })
+                              }}
+                              inputProps={{ min: 1, max: 1440, style: { width: 80, textAlign: 'center' } }}
+                              sx={{ width: 100 }}
+                              InputProps={{
+                                endAdornment: <InputAdornment position="end">minutos</InputAdornment>,
+                              }}
+                            />
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                              {[
+                                { value: 15, label: '15 min' },
+                                { value: 30, label: '30 min' },
+                                { value: 60, label: '1h' },
+                                { value: 120, label: '2h' },
+                                { value: 480, label: '8h' },
+                              ].map((opt) => (
+                                <Button
+                                  key={opt.value}
+                                  size="small"
+                                  variant={localConfig.sessionTimeoutMinutes === opt.value ? 'contained' : 'outlined'}
+                                  color={localConfig.sessionTimeoutMinutes === opt.value ? 'primary' : 'inherit'}
+                                  onClick={() => {
+                                    setLocalConfig({ ...localConfig, sessionTimeoutMinutes: opt.value, presetName: 'custom' })
+                                    updateConfig({ sessionTimeoutMinutes: opt.value, presetName: 'custom' })
+                                  }}
+                                >
+                                  {opt.label}
+                                </Button>
+                              ))}
+                            </Box>
+                          </Box>
+                        </Paper>
+                      </Box>
+
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        <Typography variant="caption">
+                          <strong>Nota:</strong> O tempo mínimo é 1 minuto e o máximo é 1440 minutos (24 horas).
+                          Alterações só terão efeito no próximo login do usuário.
+                        </Typography>
+                      </Alert>
+                    </Box>
+
+                    <Divider />
+
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}><UserCheck size={20} /></Box> Sessão Única por Usuário
+                      </Typography>
+
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 2,
+                          borderRadius: `${config.borderRadius}px`,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: 2,
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 200, flex: 1 }}>
+                          <Box
+                            sx={{
+                              p: 1,
+                              borderRadius: '50%',
+                              bgcolor: alpha(theme.palette.warning.main, 0.1),
+                              color: 'warning.main',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <UserCheck size={24} />
+                          </Box>
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                              Permitir apenas uma sessão ativa por usuário
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Ao fazer login em um novo dispositivo/navegador, a sessão anterior será encerrada automaticamente
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={localConfig.enableSingleSession}
+                              onChange={(e) => {
+                                const val = e.target.checked
+                                setLocalConfig({ ...localConfig, enableSingleSession: val, presetName: 'custom' })
+                                updateConfig({ enableSingleSession: val, presetName: 'custom' })
+                              }}
+                              color="primary"
+                              size="small"
+                            />
+                          }
+                          label=""
+                        />
+                      </Paper>
+
+                      <Alert severity="warning" sx={{ mt: 2 }}>
+                        <Typography variant="caption">
+                          <strong>Atenção:</strong> Esta configuração requer implementação no backend (Supabase Auth).
+                          Quando ativada, novos logins invalidarão tokens de sessão anteriores do mesmo usuário.
+                        </Typography>
+                      </Alert>
                     </Box>
                   </Box>
                 )}
