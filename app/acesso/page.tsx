@@ -91,6 +91,11 @@ interface ModulePermission {
 interface CompanyOption {
   id: number
   nome: string
+  cnpj: string | null
+  email: string | null
+  telefone: string | null
+  tipo: string | null
+  ativo: boolean | null
 }
 
 interface CompanyRequest {
@@ -266,7 +271,15 @@ export default function AcessoPage() {
       const res = await fetch('/api/empresas')
       const json = await res.json()
       if (json.success) {
-        setCompanies(json.data.map((c: any) => ({ id: c.id, nome: c.nome })))
+        setCompanies(json.data.map((c: any) => ({
+          id: c.id,
+          nome: c.nome,
+          cnpj: c.cnpj || null,
+          email: c.email || null,
+          telefone: c.telefone || null,
+          tipo: c.tipo || null,
+          ativo: c.ativo,
+        })))
       }
     } catch (error) {
       console.error('Erro ao buscar empresas:', error)
@@ -787,9 +800,15 @@ export default function AcessoPage() {
                       return (
                         <TableRow key={comp.id} hover>
                           <TableCell><Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{comp.nome}</Typography></TableCell>
-                          <TableCell>--</TableCell>
-                          <TableCell>--</TableCell>
-                          <TableCell><Chip label="Ativa" size="small" color="success" /></TableCell>
+                          <TableCell>{comp.cnpj || '-'}</TableCell>
+                          <TableCell>{comp.email || '-'}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={comp.ativo ? 'Ativa' : 'Inativa'}
+                              size="small"
+                              color={comp.ativo ? 'success' : 'default'}
+                            />
+                          </TableCell>
                           <TableCell align="right"><Typography variant="body2">{userCount} usuário(s)</Typography></TableCell>
                         </TableRow>
                       )

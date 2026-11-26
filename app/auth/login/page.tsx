@@ -41,6 +41,13 @@ function LoginContent() {
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false)
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false)
 
+  // Definir cookie de expiração de sessão baseado na configuração
+  const setSessionExpiryCookie = () => {
+    const timeoutMinutes = config.sessionTimeoutMinutes || 60
+    const expiryTime = Date.now() + timeoutMinutes * 60 * 1000
+    document.cookie = `trench_session_expiry=${expiryTime}; path=/; max-age=${timeoutMinutes * 60}; ${process.env.NODE_ENV === 'production' ? 'secure; SameSite=Lax' : 'SameSite=Lax'}`
+  }
+
   // Handle URL query params from OAuth callback
   useEffect(() => {
     const info = searchParams.get('info')
@@ -157,6 +164,7 @@ function LoginContent() {
 
             await refreshAppUser(authUser.id)
             await refreshUser()
+            setSessionExpiryCookie()
             router.push('/dashboard')
             return
           } else if (solicitation.status === 'pendente') {
@@ -169,6 +177,7 @@ function LoginContent() {
         // Verificar se é um admin_sistema demo
         if (email.includes('@trench.com')) {
           await refreshUser()
+          setSessionExpiryCookie()
           router.push('/dashboard')
           return
         }
@@ -202,6 +211,7 @@ function LoginContent() {
       }
 
       await refreshUser()
+      setSessionExpiryCookie()
       router.push('/dashboard')
     } catch (err: any) {
       setErrorMessage(err.message || 'Erro de autenticação. Verifique os dados informados.')

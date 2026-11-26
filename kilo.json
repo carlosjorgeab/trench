@@ -1,5 +1,4 @@
 {
-  "$schema": "https://app.kilo.ai/config.json",
   "theme": "catppuccin",
   "tui": {
     "appearance": "light",
@@ -28,6 +27,5 @@
     "radius": 8,
     "border_radius": 4,
     "shadow": 2
-  },
-  "snapshot": false
+  }
 }

@@ -144,6 +144,7 @@ CREATE TABLE IF NOT EXISTS permissoes (
     criar BOOLEAN DEFAULT false,
     alterar BOOLEAN DEFAULT false,
     deletar BOOLEAN DEFAULT false,
+    visualizar BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT NOW()
 );
 

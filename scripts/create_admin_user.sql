@@ -22,31 +22,31 @@ CREATE TABLE IF NOT EXISTS permissoes (
 
 -- 3. Inserir/atualizar perfil do usuário na tabela usuarios
 DO $$
-DECLARE
+DECLARES
   v_auth_id UUID;
   v_user_id BIGINT;
 BEGIN
   -- Obtém o auth_id do usuário recém-criado no auth.users
-  SELECid INTO v_auth_id FROM auth.users WHERE email = 'admin@trench.com';
+  SELECT id INTO v_auth_id FROM auth.users WHERE email = 'admin@trench.com';
   
   IF v_auth_id IS NULL THEN
     RAISE EXCEPTION 'Usuário admin@trench.com não encontrado em auth.users. Crie primeiro no Dashboard > Authentication.';
   END IF;
   
   -- Tenta inserir novo usuário com auth_id
-  INSERT INTO usuarios (auth_id, empresa_id, nome, email, ativo, created_at)
-  VALUES (2e3a04bf-ba9f-42bf-916f-15deb2de0c6e, 1, 'Administrador do Sistema', 'admin@trench.com', true, NOW())
-  ON CONFLICT (auth_id) DO NOTHING;
+  INSERT INTO usuarios (id, empresa_id, nome, email, ativo, created_at)
+  VALUES (v_auth_id, 1, 'Administrador do Sistema', 'admin@trench.com', true, NOW())
+  ON CONFLICT (id) DO NOTHING;
   
   -- Se já existia, atualiza
   UPDATE usuarios 
   SET empresa_id = 1, 
       nome = 'Administrador do Sistema', 
       ativo = true
-  WHERE auth_id = v_auth_id;
+  WHERE id = v_auth_id;
   
   -- Obtém o ID do usuário para as permissões
-  SELECT id INTO v_user_id FROM usuarios WHERE auth_id = v_auth_id;
+  SELECT id INTO v_user_id FROM usuarios WHERE id = v_auth_id;
   
   -- 4. Inserir/atualizar permissões de administrador para todos os módulos
   INSERT INTO permissoes (usuario_id, modulo, criar, alterar, deletar, visualizar)
@@ -76,7 +76,6 @@ END $$;
 -- 5. Verificar se o usuário foi criado corretamente
 SELECT 
   u.id,
-  u.auth_id,
   u.nome,
   u.email,
   u.empresa_id,
@@ -88,4 +87,4 @@ SELECT
   p.visualizar
 FROM usuarios u
 LEFT JOIN permissoes p ON u.id = p.usuario_id
-WHERE u.auth_id = (SELECT id FROM auth.users WHERE email = 'admin@trench.com');
+WHERE u.id = (SELECT id FROM auth.users WHERE email = 'admin@trench.com');

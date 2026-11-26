@@ -7,7 +7,7 @@ FROM auth.users
 WHERE email = 'admin@trench.com';
 
 -- 2. Verificar se o perfil existe em usuarios
-SELECT 'usuarios' as tabela, id, auth_id, nome, email, empresa_id, ativo, created_at
+SELECT 'usuarios' as tabela, id, nome, email, empresa_id, ativo, created_at
 FROM usuarios 
 WHERE email = 'admin@trench.com';
 
@@ -53,7 +53,7 @@ BEGIN
 END $$;
 
 -- 6. Verificar resultado final
-SELECT 'Resultado final' as status, u.id, u.auth_id, u.nome, u.email, u.empresa_id, u.ativo, e.nome as empresa_nome, e.ativo as empresa_ativa
+SELECT 'Resultado final' as status, u.id, u.nome, u.email, u.empresa_id, u.ativo, e.nome as empresa_nome, e.ativo as empresa_ativa
 FROM usuarios u
 LEFT JOIN empresas e ON u.empresa_id = e.id
 WHERE u.email = 'admin@trench.com';
