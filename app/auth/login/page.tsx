@@ -105,7 +105,7 @@ function LoginContent() {
         // Verificar se o usuário existe na tabela usuarios mas a empresa está inativa
         const { data: userCheck } = await supabase
           .from('usuarios')
-          .select('id, empresa_id')
+          .select('id, empresa_id, perfil')
           .eq('id', authUser.id)
           .maybeSingle()
 
@@ -120,13 +120,29 @@ function LoginContent() {
               .maybeSingle()
             empresaAtiva = empresaData?.ativo === true
           }
-          
-          if (userCheck.empresa_id && !empresaAtiva) {
+
+          // Se é admin_sistema ou email @trench.com, permite sem empresa vinculada
+          const isSystemAdmin = userCheck.perfil === 'admin_sistema' || userCheck.perfil === 'admin' || email.includes('@trench.com')
+
+          if (userCheck.empresa_id && !empresaAtiva && !isSystemAdmin) {
             throw new Error('A empresa vinculada ao seu usuário está inativa. Entre em contato com o administrador para reativar a empresa.')
           }
-          
-          if (!userCheck.empresa_id) {
+
+          if (!userCheck.empresa_id && !isSystemAdmin) {
             throw new Error('Seu usuário não está vinculado a nenhuma empresa. Entre em contato com o administrador.')
+          }
+
+          // Se é admin_sistema sem empresa, criar registro mínimo e continuar
+          if (!userCheck.empresa_id && isSystemAdmin) {
+            await supabase
+              .from('usuarios')
+              .update({ perfil: 'admin_sistema', ativo: true })
+              .eq('id', authUser.id)
+            await refreshAppUser(authUser.id)
+            await refreshUser()
+            setSessionExpiryCookie()
+            router.push('/dashboard')
+            return
           }
         }
 
@@ -176,6 +192,17 @@ function LoginContent() {
 
         // Verificar se é um admin_sistema demo
         if (email.includes('@trench.com')) {
+          // Garantir registro na tabela usuarios com perfil admin_sistema
+          await supabase
+            .from('usuarios')
+            .upsert([{
+              id: authUser.id,
+              email: authUser.email,
+              nome: authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Administrador do Sistema',
+              perfil: 'admin_sistema',
+              ativo: true,
+            }], { onConflict: 'id' })
+          await refreshAppUser(authUser.id)
           await refreshUser()
           setSessionExpiryCookie()
           router.push('/dashboard')

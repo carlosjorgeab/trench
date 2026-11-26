@@ -50,6 +50,24 @@ export async function GET(request: NextRequest) {
     }
 
     if (!empresaAtiva) {
+      // Permitir admin_sistema mesmo sem empresa vinculada
+      if (userData.perfil === 'admin_sistema' || userData.perfil === 'admin') {
+        return NextResponse.json({
+          success: true,
+          data: {
+            id: userData.id,
+            auth_id: userData.id,
+            nome: userData.nome,
+            email: userData.email,
+            perfil: userData.perfil || 'usuario',
+            empresa_id: userData.empresa_id,
+            empresa_nome: empresaNome,
+            empresa_tipo: empresaTipo,
+            ativo: userData.ativo,
+            isSystemAdmin: true,
+          }
+        })
+      }
       return NextResponse.json({ success: false, data: null })
     }
 

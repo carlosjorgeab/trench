@@ -8,21 +8,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY || ''
 )
 
-async function getEmpresaId(request: NextRequest): Promise<number | null> {
+async function getEmpresaId(request: NextRequest): Promise<{ empresaId: number | null; isSystemAdmin: boolean }> {
   const { searchParams } = new URL(request.url)
   const empresaId = searchParams.get('empresa_id')
-  if (empresaId) return parseInt(empresaId)
+  if (empresaId) return { empresaId: parseInt(empresaId), isSystemAdmin: false }
 
   const userId = searchParams.get('user_id')
   if (userId) {
     const { data: user } = await supabase
       .from('usuarios')
-      .select('empresa_id')
+      .select('empresa_id, perfil')
       .eq('id', userId)
       .maybeSingle()
-    return user?.empresa_id || null
+    const isSystemAdmin = user?.perfil === 'admin_sistema' || user?.perfil === 'admin'
+    return { empresaId: user?.empresa_id || null, isSystemAdmin }
   }
-  return null
+  return { empresaId: null, isSystemAdmin: false }
 }
 
 async function getFinancialSummary(empresaId: number) {
@@ -256,33 +257,36 @@ async function getRecentTransactions(empresaId: number, limit = 10) {
 
 export async function GET(request: NextRequest) {
   try {
-    const empresaId = await getEmpresaId(request)
+    const { empresaId, isSystemAdmin } = await getEmpresaId(request)
 
-    if (!empresaId) {
+    if (!empresaId && !isSystemAdmin) {
       return NextResponse.json(
         { success: false, error: 'Empresa não encontrada' },
         { status: 400 }
       )
     }
 
+    // Se é admin_sistema sem empresa específica, usar empresa_id = 0 para retornar dados vazios/agregados
+    const effectiveEmpresaId = empresaId || 0
+
     // Run each query independently to isolate errors
-    const financialSummaryPromise = getFinancialSummary(empresaId).catch((e) => {
+    const financialSummaryPromise = getFinancialSummary(effectiveEmpresaId).catch((e) => {
       console.error('getFinancialSummary error:', e)
       return null
     })
-    const bankAccountsPromise = getBankAccounts(empresaId).catch((e) => {
+    const bankAccountsPromise = getBankAccounts(effectiveEmpresaId).catch((e) => {
       console.error('getBankAccounts error:', e)
       return []
     })
-    const cashFlowHistoryPromise = getCashFlowHistory(empresaId).catch((e) => {
+    const cashFlowHistoryPromise = getCashFlowHistory(effectiveEmpresaId).catch((e) => {
       console.error('getCashFlowHistory error:', e)
       return []
     })
-    const categoryExpensesPromise = getCategoryExpenses(empresaId).catch((e) => {
+    const categoryExpensesPromise = getCategoryExpenses(effectiveEmpresaId).catch((e) => {
       console.error('getCategoryExpenses error:', e)
       return []
     })
-    const recentTransactionsPromise = getRecentTransactions(empresaId).catch((e) => {
+    const recentTransactionsPromise = getRecentTransactions(effectiveEmpresaId).catch((e) => {
       console.error('getRecentTransactions error:', e)
       return []
     })

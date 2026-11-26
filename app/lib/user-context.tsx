@@ -8,11 +8,12 @@ export interface AppUser {
   auth_id: string
   nome: string
   email: string
-  perfil: 'admin_sistema' | 'admin_empresa' | 'gestor' | 'analista' | 'usuario'
+  perfil: 'admin_sistema' | 'admin_empresa' | 'gestor' | 'analista' | 'usuario' | 'admin'
   empresa_id: number | null
   empresa_nome: string | null
   empresa_tipo: string | null
   ativo: boolean
+  isSystemAdmin?: boolean
 }
 
 interface UserContextType {

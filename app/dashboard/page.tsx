@@ -153,7 +153,8 @@ export default function DashboardPage() {
   }
 
   const fetchDashboardData = async () => {
-    if (!appUser?.empresa_id) {
+    const isSystemAdmin = appUser?.perfil === 'admin_sistema' || appUser?.perfil === 'admin'
+    if (!appUser?.empresa_id && !isSystemAdmin) {
       setError('Empresa não vinculada ao usuário')
       setLoading(false)
       return
@@ -267,7 +268,9 @@ export default function DashboardPage() {
     )
   }
 
-  if (!appUser.empresa_id) {
+  const isSystemAdmin = appUser?.perfil === 'admin_sistema' || appUser?.perfil === 'admin'
+
+  if (!appUser.empresa_id && !isSystemAdmin) {
     return (
       <AppShell
         title="Painel Financeiro Executivo"

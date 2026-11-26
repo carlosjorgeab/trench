@@ -7,24 +7,17 @@
 -- Password: Cjl@j2326
 -- Email Confirm: true
 
--- 2. Garantir que a tabela permissoes existe
-CREATE TABLE IF NOT EXISTS permissoes (
-    id SERIAL PRIMARY KEY,
-    usuario_id BIGINT NOT NULL REFERENCES usuarios(id),
-    modulo VARCHAR(100) NOT NULL,
-    criar BOOLEAN DEFAULT false,
-    alterar BOOLEAN DEFAULT false,
-    deletar BOOLEAN DEFAULT false,
-    visualizar BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(usuario_id, modulo)
-);
+-- 2. Criar empresa padrão se não existir
+INSERT INTO empresas (nome, cnpj, email, ativo)
+VALUES ('Empresa Administração', '00.000.000/0000-00', 'admin@trench.com', true)
+ON CONFLICT (cnpj) DO NOTHING;
 
--- 3. Inserir/atualizar perfil do usuário na tabela usuarios
+-- 3. Obter o ID da empresa padrão
 DO $$
-DECLARES
+DECLARE
   v_auth_id UUID;
-  v_user_id BIGINT;
+  v_empresa_id INTEGER;
+  v_user_id UUID;
 BEGIN
   -- Obtém o auth_id do usuário recém-criado no auth.users
   SELECT id INTO v_auth_id FROM auth.users WHERE email = 'admin@trench.com';
@@ -33,15 +26,24 @@ BEGIN
     RAISE EXCEPTION 'Usuário admin@trench.com não encontrado em auth.users. Crie primeiro no Dashboard > Authentication.';
   END IF;
   
-  -- Tenta inserir novo usuário com auth_id
+  -- Obtém o ID da empresa padrão
+  SELECT id INTO v_empresa_id FROM empresas WHERE email = 'admin@trench.com' LIMIT 1;
+  
+  IF v_empresa_id IS NULL THEN
+    RAISE EXCEPTION 'Empresa padrão não encontrada para admin@trench.com.';
+  END IF;
+  
+  -- Tenta inserir novo usuário
   INSERT INTO usuarios (id, empresa_id, nome, email, ativo, created_at)
-  VALUES (v_auth_id, 1, 'Administrador do Sistema', 'admin@trench.com', true, NOW())
+  VALUES (v_auth_id, v_empresa_id, 'Administrador do Sistema', 'admin@trench.com', true, NOW())
   ON CONFLICT (id) DO NOTHING;
   
   -- Se já existia, atualiza
   UPDATE usuarios 
-  SET empresa_id = 1, 
+  SET empresa_id = v_empresa_id, 
       nome = 'Administrador do Sistema', 
+      email = 'admin@trench.com',
+      perfil = 'admin_sistema',
       ativo = true
   WHERE id = v_auth_id;
   
@@ -56,11 +58,12 @@ BEGIN
     true, true, true, true
   FROM (
     VALUES 
-      ('cadastros'),
+      ('dashboard'),
       ('financeiro'),
       ('lancamentos'),
       ('prestacao'),
       ('cotacao'),
+      ('cadastros'),
       ('configuracao'),
       ('acesso')
   ) AS m(modulo)
@@ -70,7 +73,7 @@ BEGIN
     deletar = true,
     visualizar = true;
     
-  RAISE NOTICE 'Usuário admin@trench.com configurado com ID: %, Auth ID: %', v_user_id, v_auth_id;
+  RAISE NOTICE 'Usuário admin@trench.com configurado com ID: %, Auth ID: %, Empresa: %', v_user_id, v_auth_id, v_empresa_id;
 END $$;
 
 -- 5. Verificar se o usuário foi criado corretamente
@@ -78,13 +81,10 @@ SELECT
   u.id,
   u.nome,
   u.email,
+  u.perfil,
   u.empresa_id,
   u.ativo,
-  p.modulo,
-  p.criar,
-  p.alterar,
-  p.deletar,
-  p.visualizar
+  e.nome as empresa_nome
 FROM usuarios u
-LEFT JOIN permissoes p ON u.id = p.usuario_id
+LEFT JOIN empresas e ON u.empresa_id = e.id
 WHERE u.id = (SELECT id FROM auth.users WHERE email = 'admin@trench.com');
