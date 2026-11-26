@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password, nome, empresa_id, perfil, ativo = true } = body
+    const { email, password, nome, empresa_id, perfil, ativo = true, permissoes } = body
 
     if (!email || !password || !nome || !empresa_id) {
       return NextResponse.json(
@@ -70,15 +70,15 @@ export async function POST(request: NextRequest) {
       throw userError
     }
 
-    // 3. Criar permissões padrão baseadas no perfil
-    const defaultPermissions = getDefaultPermissions(perfil || 'usuario')
-    const permissoesData = defaultPermissions.map(modulo => ({
+    // 3. Salvar permissões granulares (se fornecidas) ou aplicar defaults por perfil
+    const modulosPermissoes = permissoes || getDefaultPermissions(perfil || 'usuario')
+    const permissoesData = modulosPermissoes.map((modulo: string) => ({
       usuario_id: authUserId,
       modulo,
-      visualizar: modulo !== 'acesso' || perfil === 'admin',
+      visualizar: modulo !== 'acesso' || (perfil === 'admin' || perfil === 'admin_sistema'),
       criar: modulo !== 'acesso' && modulo !== 'configuracao',
       editar: modulo !== 'acesso' && modulo !== 'configuracao',
-      deletar: perfil === 'admin' && modulo !== 'acesso' && modulo !== 'configuracao',
+      deletar: (perfil === 'admin' || perfil === 'admin_sistema') && modulo !== 'acesso' && modulo !== 'configuracao',
       exportar: modulo !== 'acesso'
     }))
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, ...updateData } = body
+    const { id, permissoes, ...updateData } = body
 
     // Se está atualizando empresa_id, garantir que é número
     if (updateData.empresa_id !== undefined) {
@@ -114,6 +114,27 @@ export async function PUT(request: NextRequest) {
       .select()
 
     if (error) throw error
+
+    // Salvar/atualizar permissões granulares se fornecidas
+    if (permissoes && Array.isArray(permissoes)) {
+      // Remover permissões existentes do usuário
+      await supabase.from('permissoes').delete().eq('usuario_id', id)
+
+      // Inserir novas permissões
+      if (permissoes.length > 0) {
+        const permissoesData = permissoes.map((p: any) => ({
+          usuario_id: id,
+          modulo: p.modulo,
+          visualizar: p.visualizar ?? false,
+          criar: p.criar ?? false,
+          editar: p.editar ?? false,
+          deletar: p.deletar ?? false,
+          exportar: p.exportar ?? false,
+        }))
+        await supabase.from('permissoes').insert(permissoesData)
+      }
+    }
+
     return NextResponse.json({ success: true, data: data[0] })
   } catch (error: any) {
     return NextResponse.json(

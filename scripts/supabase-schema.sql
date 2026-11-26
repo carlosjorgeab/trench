@@ -83,6 +83,19 @@ CREATE TABLE IF NOT EXISTS contas (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Tabela de Plano de Contas (criada ANTES de categorias pois é referenciada por ela)
+CREATE TABLE IF NOT EXISTS plano_contas (
+    id SERIAL PRIMARY KEY,
+    empresa_id INTEGER REFERENCES empresas(id),
+    parent_id INTEGER REFERENCES plano_contas(id),
+    nivel INTEGER NOT NULL DEFAULT 1,
+    codigo VARCHAR(50) NOT NULL,
+    nome VARCHAR(255) NOT NULL,
+    tipo VARCHAR(50),
+    ativo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Tabela de CATEGORIAS
 CREATE TABLE IF NOT EXISTS categorias (
     id SERIAL PRIMARY KEY,
@@ -112,18 +125,29 @@ CREATE TABLE IF NOT EXISTS centros_custos (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Tabela de Plano de Contas
-CREATE TABLE IF NOT EXISTS plano_contas (
+-- ============================================================
+-- Catálogo de Módulos do Sistema (base da Matriz de Permissões)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS modulos (
     id SERIAL PRIMARY KEY,
-    empresa_id INTEGER REFERENCES empresas(id),
-    parent_id INTEGER REFERENCES plano_contas(id),
-    nivel INTEGER NOT NULL DEFAULT 1,
-    codigo VARCHAR(50) NOT NULL,
-    nome VARCHAR(255) NOT NULL,
-    tipo VARCHAR(50),
+    nome VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) NOT NULL UNIQUE,
+    descricao TEXT,
+    icone VARCHAR(50),
     ativo BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Sementes dos módulos do sistema (conforme PRD - Módulos do Sistema)
+INSERT INTO modulos (nome, slug, descricao, icone, ativo) VALUES
+    ('Dashboard Geral', 'dashboard', 'Métricas consolidadas e gráficos executivos', 'LayoutDashboard', true),
+    ('Financeiro & Lançamentos', 'financeiro', 'Entradas, saídas, anexos e conciliação bancária', 'DollarSign', true),
+    ('Prestação de Contas', 'prestacao', 'Relatórios de prestação e auditoria contábil', 'FileSpreadsheet', true),
+    ('Cotação de Moedas', 'cotacao', 'Taxas cambiais e histórico de moedas estrangeiras', 'TrendingUp', true),
+    ('Cadastros Mestres', 'cadastros', 'Clientes, fornecedores, contas e plano contábil', 'Database', true),
+    ('Gestão de Usuários & Permissões', 'acesso', 'Administração de acessos e concessão de privilégios', 'ShieldCheck', true),
+    ('Configurações do Sistema', 'configuracao', 'Personalização visual de temas, cores e tipografia', 'Settings', true)
+ON CONFLICT (slug) DO NOTHING;
 
 -- Tabela de Usuários
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -136,16 +160,20 @@ CREATE TABLE IF NOT EXISTS usuarios (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Tabela de Permissões
+-- Tabela de Permissões (Matriz de Permissões Granulares)
+-- Uma linha por combinação de usuário + módulo (unique constraint)
 CREATE TABLE IF NOT EXISTS permissoes (
     id SERIAL PRIMARY KEY,
-    usuario_id UUID REFERENCES usuarios(id),
+    usuario_id UUID REFERENCES usuarios(id) ON DELETE CASCADE,
     modulo VARCHAR(100) NOT NULL,
-    criar BOOLEAN DEFAULT false,
-    alterar BOOLEAN DEFAULT false,
-    deletar BOOLEAN DEFAULT false,
     visualizar BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT NOW()
+    criar BOOLEAN DEFAULT false,
+    editar BOOLEAN DEFAULT false,
+    deletar BOOLEAN DEFAULT false,
+    exportar BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(usuario_id, modulo)
 );
 
 -- Tabela de Configurações
@@ -172,3 +200,66 @@ CREATE TABLE IF NOT EXISTS anexos_lancamento (
     lancamento_id INTEGER REFERENCES lancamentos(id) NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- ============================================================
+-- Row Level Security (RLS)
+-- ============================================================
+
+ALTER TABLE empresas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE permissoes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE modulos ENABLE ROW LEVEL SECURITY;
+
+-- Módulos: leitura para usuários autenticados
+CREATE POLICY "modulos_select_authenticated" ON modulos
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+-- Usuários: próprio registro e admin_sistema lê todos
+CREATE POLICY "usuarios_select_own" ON usuarios
+  FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "usuarios_select_admin_sistema" ON usuarios
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM usuarios u
+      WHERE u.id = auth.uid() AND u.perfil = 'admin_sistema'
+    )
+  );
+
+CREATE POLICY "usuarios_update_own" ON usuarios
+  FOR UPDATE USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+-- Empresas: usuário lê sua empresa; admin_sistema lê todas
+CREATE POLICY "empresas_select_own" ON empresas
+  FOR SELECT USING (
+    id IN (SELECT empresa_id FROM usuarios WHERE id = auth.uid())
+  );
+
+CREATE POLICY "empresas_select_admin_sistema" ON empresas
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM usuarios u
+      WHERE u.id = auth.uid() AND u.perfil = 'admin_sistema'
+    )
+  );
+
+-- Permissões: usuário lê próprias; admin_sistema gerencia tudo
+CREATE POLICY "permissoes_select_own" ON permissoes
+  FOR SELECT USING (auth.uid() = usuario_id);
+
+CREATE POLICY "permissoes_select_admin_sistema" ON permissoes
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM usuarios u
+      WHERE u.id = auth.uid() AND u.perfil = 'admin_sistema'
+    )
+  );
+
+CREATE POLICY "permissoes_manage_admin_sistema" ON permissoes
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM usuarios u
+      WHERE u.id = auth.uid() AND u.perfil = 'admin_sistema'
+    )
+  );

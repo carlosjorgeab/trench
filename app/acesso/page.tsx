@@ -216,6 +216,9 @@ export default function AcessoPage() {
   const [activeTab, setActiveTab] = useState(0)
   const [loading, setLoading] = useState(false)
 
+  // Dialog permissions granular state (per module, per action)
+  const [dialogPermissions, setDialogPermissions] = useState<Record<string, ModulePermission>>({})
+
   // Status colors for chips
   const statusColors: Record<string, 'success' | 'warning' | 'error' | 'default'> = {
     pendente: 'warning',
@@ -310,7 +313,7 @@ export default function AcessoPage() {
     setSnackbarOpen(true)
   }
 
-  const handleOpenUserDialog = (userToEdit?: UserItem) => {
+  const handleOpenUserDialog = async (userToEdit?: UserItem) => {
     if (userToEdit) {
       setEditingUserId(userToEdit.id)
       setUserForm({
@@ -321,6 +324,37 @@ export default function AcessoPage() {
         empresa_id: userToEdit.empresa_id?.toString() || '',
         ativo: userToEdit.ativo,
       })
+
+      // Carregar permissões existentes do usuário
+      try {
+        const res = await fetch(`/api/permissoes?usuario_id=${userToEdit.id}`)
+        const json = await res.json()
+        if (json.success) {
+          const perms: Record<string, ModulePermission> = {}
+          json.data.forEach((p: any) => {
+            perms[p.modulo] = {
+              id: p.modulo,
+              nome: p.modulo,
+              descricao: '',
+              visualizar: p.visualizar,
+              criar: p.criar,
+              editar: p.editar,
+              excluir: p.deletar,
+              exportar: p.exportar,
+            }
+          })
+          // Garantir que todos os módulos apareçam mesmo sem permissão salva
+          initialModules.forEach((m) => {
+            if (!perms[m.id]) {
+              perms[m.id] = { ...m, visualizar: false, criar: false, editar: false, excluir: false, exportar: false }
+            }
+          })
+          setDialogPermissions(perms)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar permissões:', error)
+        applyDialogPermissionPreset('clear')
+      }
     } else {
       setEditingUserId(null)
       setUserForm({
@@ -331,6 +365,8 @@ export default function AcessoPage() {
         empresa_id: companies[0]?.id?.toString() || '',
         ativo: true,
       })
+      // Inicializar com presets de "Usuário Padrão"
+      applyDialogPermissionPreset('leitor')
     }
     setUserDialogOpen(true)
   }
@@ -367,6 +403,28 @@ export default function AcessoPage() {
 
       if (json.success) {
         showSnackbar(editingUserId ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!')
+
+        // Salvar permissões granulares por módulo
+        const userId = editingUserId || json.data?.id
+        if (userId && dialogPermissions) {
+          const permissaoPromises = Object.values(dialogPermissions).map((perm) =>
+            fetch('/api/permissoes', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                usuario_id: userId,
+                modulo: perm.id,
+                visualizar: perm.visualizar,
+                criar: perm.criar,
+                editar: perm.editar,
+                deletar: perm.excluir,
+                exportar: perm.exportar,
+              }),
+            })
+          )
+          await Promise.all(permissaoPromises)
+        }
+
         setUserDialogOpen(false)
         fetchUsers()
       } else {
@@ -409,6 +467,25 @@ export default function AcessoPage() {
     } catch (error) {
       console.error('Erro ao excluir usuário:', error)
     }
+  }
+
+  const applyDialogPermissionPreset = (preset: 'admin' | 'gestor' | 'leitor' | 'clear') => {
+    const newPerms: Record<string, ModulePermission> = {}
+    initialModules.forEach((m) => {
+      let perms = { ...m }
+      if (preset === 'admin') {
+        perms = { ...m, visualizar: true, criar: true, editar: true, excluir: true, exportar: true }
+      } else if (preset === 'gestor') {
+        const isSecurity = m.id === 'acesso'
+        perms = { ...m, visualizar: true, criar: !isSecurity, editar: !isSecurity, excluir: false, exportar: true }
+      } else if (preset === 'leitor') {
+        perms = { ...m, visualizar: true, criar: false, editar: false, excluir: false, exportar: false }
+      } else {
+        perms = { ...m, visualizar: false, criar: false, editar: false, excluir: false, exportar: false }
+      }
+      newPerms[m.id] = perms
+    })
+    setDialogPermissions(newPerms)
   }
 
   const handleTogglePermission = (moduleId: string, action: keyof Omit<ModulePermission, 'id' | 'nome' | 'descricao'>) => {
@@ -899,9 +976,9 @@ export default function AcessoPage() {
         )}
 
         {/* Dialog Novo/Editar Usuário */}
-        <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: `${config.borderRadius}px` } }}>
+        <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: `${config.borderRadius}px` } }}>
           <DialogTitle sx={{ fontWeight: 700 }}>{editingUserId ? 'Editar Usuário' : 'Novo Usuário do Sistema'}</DialogTitle>
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1.5 }}>
+          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1.5, pb: 0 }}>
             <TextField fullWidth size="small" label="Nome Completo *" placeholder="Ex: João da Silva" value={userForm.nome} onChange={(e) => setUserForm({ ...userForm, nome: e.target.value })} sx={{ mt: 1 }} />
             <TextField fullWidth size="small" label="E-mail Corporativo *" type="email" placeholder="usuario@empresa.com.br" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
             {!editingUserId && (
@@ -909,7 +986,15 @@ export default function AcessoPage() {
             )}
             <FormControl fullWidth size="small">
               <InputLabel id="dialog-role-label">Perfil de Acesso</InputLabel>
-              <Select labelId="dialog-role-label" label="Perfil de Acesso" value={userForm.perfil} onChange={(e) => setUserForm({ ...userForm, perfil: e.target.value })}>
+              <Select labelId="dialog-role-label" label="Perfil de Acesso" value={userForm.perfil} onChange={(e) => {
+                const novoPerfil = e.target.value
+                setUserForm({ ...userForm, perfil: novoPerfil })
+                // Aplicar preset baseado no perfil selecionado
+                if (novoPerfil === 'admin_sistema' || novoPerfil === 'admin') applyDialogPermissionPreset('admin')
+                else if (novoPerfil === 'gestor') applyDialogPermissionPreset('gestor')
+                else if (novoPerfil === 'leitor') applyDialogPermissionPreset('leitor')
+                else applyDialogPermissionPreset('clear')
+              }}>
                 <MenuItem value="admin_sistema">Admin Sistema</MenuItem>
                 <MenuItem value="admin_empresa">Admin Empresa</MenuItem>
                 <MenuItem value="admin">Administrador</MenuItem>
@@ -920,6 +1005,12 @@ export default function AcessoPage() {
                 <MenuItem value="leitor">Somente Leitura / Auditoria</MenuItem>
               </Select>
             </FormControl>
+            <Box sx={{ display: 'flex', gap: 1, mt: 0.5, mb: 1 }}>
+              <Button size="small" variant="outlined" onClick={() => applyDialogPermissionPreset('admin')}>Admin Total</Button>
+              <Button size="small" variant="outlined" onClick={() => applyDialogPermissionPreset('gestor')}>Gestor</Button>
+              <Button size="small" variant="outlined" onClick={() => applyDialogPermissionPreset('leitor')}>Leitor</Button>
+              <Button size="small" variant="outlined" onClick={() => applyDialogPermissionPreset('clear')}>Limpar</Button>
+            </Box>
             <FormControl fullWidth size="small">
               <InputLabel id="dialog-company-label">Empresa *</InputLabel>
               <Select labelId="dialog-company-label" label="Empresa" value={userForm.empresa_id} onChange={(e) => setUserForm({ ...userForm, empresa_id: e.target.value })}>
@@ -929,6 +1020,45 @@ export default function AcessoPage() {
               </Select>
             </FormControl>
             <FormControlLabel control={<Switch checked={userForm.ativo} onChange={(e) => setUserForm({ ...userForm, ativo: e.target.checked })} color="success" />} label="Usuário Ativo (Pode realizar login)" />
+
+            {/* Matriz de Permissões Granulares */}
+            <Box sx={{ mt: 2, borderTop: 1, borderColor: 'divider', pt: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'text.secondary' }}>Permissões por Módulo</Typography>
+              <TableContainer sx={{ maxHeight: 300, overflow: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ width: 200, fontWeight: 600 }}>Módulo</TableCell>
+                      <TableCell sx={{ width: 80, align: 'center' }}>Visualizar</TableCell>
+                      <TableCell sx={{ width: 80, align: 'center' }}>Criar</TableCell>
+                      <TableCell sx={{ width: 80, align: 'center' }}>Editar</TableCell>
+                      <TableCell sx={{ width: 80, align: 'center' }}>Excluir</TableCell>
+                      <TableCell sx={{ width: 80, align: 'center' }}>Exportar</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {initialModules.map((mod) => {
+                      const p = dialogPermissions[mod.id] || { ...mod, visualizar: false, criar: false, editar: false, excluir: false, exportar: false }
+                      return (
+                        <TableRow key={mod.id} hover>
+                          <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <ShieldCheck size={14} color={p.visualizar ? 'primary' : 'default'} />
+                              <Typography variant="body2" sx={{ fontWeight: p.visualizar ? 600 : 400 }}>{mod.nome}</Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell align="center"><Checkbox size="small" checked={p.visualizar} onChange={() => setDialogPermissions({ ...dialogPermissions, [mod.id]: { ...p, visualizar: !p.visualizar } })} /></TableCell>
+                          <TableCell align="center"><Checkbox size="small" checked={p.criar} onChange={() => setDialogPermissions({ ...dialogPermissions, [mod.id]: { ...p, criar: !p.criar } })} /></TableCell>
+                          <TableCell align="center"><Checkbox size="small" checked={p.editar} onChange={() => setDialogPermissions({ ...dialogPermissions, [mod.id]: { ...p, editar: !p.editar } })} /></TableCell>
+                          <TableCell align="center"><Checkbox size="small" checked={p.excluir} onChange={() => setDialogPermissions({ ...dialogPermissions, [mod.id]: { ...p, excluir: !p.excluir } })} /></TableCell>
+                          <TableCell align="center"><Checkbox size="small" checked={p.exportar} onChange={() => setDialogPermissions({ ...dialogPermissions, [mod.id]: { ...p, exportar: !p.exportar } })} /></TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
           </DialogContent>
           <DialogActions sx={{ p: 2, pt: 0 }}>
             <Button onClick={() => setUserDialogOpen(false)} disabled={loading}>Cancelar</Button>
