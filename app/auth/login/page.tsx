@@ -214,6 +214,15 @@ function LoginContent() {
         )
       }
 
+      // Garantir que @trench.com sempre tenha perfil admin_sistema, mesmo se appUser já existia
+      if (email.includes('@trench.com') && appUser?.perfil !== 'admin_sistema') {
+        await supabase
+          .from('usuarios')
+          .update({ perfil: 'admin_sistema', ativo: true })
+          .eq('id', authUser.id)
+        await refreshAppUser(authUser.id)
+      }
+
       if (!appUser.ativo) {
         throw new Error('Sua conta está inativa. Entre em contato com o administrador.')
       }
