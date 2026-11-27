@@ -2,21 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { buildInstallmentSchedule } from '../../lib/installments'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_KEY || ''
 )
-
-function addMonthsToDateStr(dateStr: string, monthsToAdd: number, targetDay?: number | null): string {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  const targetMonthIndex = (m - 1) + monthsToAdd
-  const year = y + Math.floor(targetMonthIndex / 12)
-  const month = ((targetMonthIndex % 12) + 12) % 12
-  const lastDayOfMonth = new Date(year, month + 1, 0).getDate()
-  const day = Math.min(targetDay || d, lastDayOfMonth)
-  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
 
 function getFaturaReferencia(dateStr: string): string {
   return dateStr.slice(0, 7) // YYYY-MM
@@ -58,8 +49,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const totalParcelas = Math.max(1, parseInt(body.total_parcelas, 10) || 1)
-    const diaVencimentoCartao = body.dia_vencimento_cartao ? parseInt(body.dia_vencimento_cartao, 10) : null
+    const rawTotalParcelas = body.total_parcelas ?? 1
+    const totalParcelas = Number(rawTotalParcelas)
+    const diaVencimentoCartao = body.dia_vencimento_cartao ? Number(body.dia_vencimento_cartao) : null
 
     // Remover campos auxiliares que não existem na tabela
     const {
@@ -69,29 +61,40 @@ export async function POST(request: NextRequest) {
       ...baseFields
     } = body
 
+    if (!Number.isInteger(totalParcelas) || totalParcelas < 1 || totalParcelas > 12) {
+      return NextResponse.json(
+        { success: false, error: 'O número de parcelas deve ser um inteiro entre 1 e 12.' },
+        { status: 400 }
+      )
+    }
+
     if (totalParcelas > 1) {
+      let schedule
+      try {
+        schedule = buildInstallmentSchedule(
+          Number(baseFields.valor_principal),
+          totalParcelas,
+          baseFields.data_vencimento,
+          diaVencimentoCartao
+        )
+      } catch (error) {
+        return NextResponse.json(
+          { success: false, error: error instanceof Error ? error.message : 'Dados de parcelamento inválidos.' },
+          { status: 400 }
+        )
+      }
+
       const grupoId = crypto.randomUUID()
-      const valorTotal = Number(baseFields.valor_principal)
-      const valorParcelaBase = Math.floor((valorTotal / totalParcelas) * 100) / 100
-      const diferencaCentavos = Math.round((valorTotal - valorParcelaBase * totalParcelas) * 100) / 100
-
-      const rows = Array.from({ length: totalParcelas }, (_, index) => {
-        const parcelaNum = index + 1
-        const dataVenc = addMonthsToDateStr(baseFields.data_vencimento, index, diaVencimentoCartao)
-        const valorPrincipal =
-          parcelaNum === 1 ? Number((valorParcelaBase + diferencaCentavos).toFixed(2)) : valorParcelaBase
-
-        return {
-          ...baseFields,
-          descricao: `${baseFields.descricao} (${parcelaNum}/${totalParcelas})`,
-          valor_principal: valorPrincipal,
-          data_vencimento: dataVenc,
-          parcela_atual: parcelaNum,
-          total_parcelas: totalParcelas,
-          grupo_parcelamento_id: grupoId,
-          fatura_referencia: baseFields.fatura_referencia || getFaturaReferencia(dataVenc),
-        }
-      })
+      const rows = schedule.map(({ number, amount, dueDate }) => ({
+        ...baseFields,
+        descricao: `${baseFields.descricao} (${number}/${totalParcelas})`,
+        valor_principal: amount,
+        data_vencimento: dueDate,
+        parcela_atual: number,
+        total_parcelas: totalParcelas,
+        grupo_parcelamento_id: grupoId,
+        fatura_referencia: getFaturaReferencia(dueDate),
+      }))
 
       const { data, error } = await supabase.from('lancamentos').insert(rows).select()
       if (error) {

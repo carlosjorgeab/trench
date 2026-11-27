@@ -14,7 +14,7 @@ Campos existentes: `total_parcelas`, `parcela_atual`, `grupo_parcelamento_id`, `
 
 ### 3.1 Opções de Parcelamento
 
-O usuário deve poder escolher o número de parcelas. As opções disponíveis são: 1x, 2x, 3x, 4x, 5x, 6x, 10x, 12x.
+O usuário deve poder escolher o número de parcelas. As opções rápidas disponíveis são: 1x, 2x, 3x, 4x, 5x, 6x, 10x e 12x. A opção "Personalizado" permite informar qualquer quantidade inteira de 1 a 12.
 
 ### 3.2 Cálculo de Datas de Vencimento
 
@@ -36,8 +36,8 @@ O valor total é distribuído da seguinte maneira:
 
 #### Tela de Criação/Edição:
 
-- **Select de parcelas**: escolher 1x a 12x ou "Personalizado"
-- **Preview**: mostrar resumo das parcelas antes de confirmar
+- **Select de parcelas**: escolher uma opção rápida ou "Personalizado" (1 a 12)
+- **Preview**: mostrar valores e vencimentos de todas as parcelas antes de confirmar, atualizando quando valor, quantidade ou datas mudarem
 - **Informações do cartão**: exibir dia de vencimento quando conta for do tipo cartão
 
 #### Exemplo de preview:
@@ -57,7 +57,7 @@ O valor total é distribuído da seguinte maneira:
 ### Cenário 2: Parcelamento em conta bancária
 
 1. Usuário seleciona conta do tipo "Bancária"
-2. Preenche os dados
+2. Preenche os dados; o primeiro vencimento usa a data de lançamento
 3. Seleciona número de parcelas
 4. Sistema cria parcelas com datas baseadas na data de lançamento + meses subsequentes
 

@@ -14,6 +14,7 @@ import {
 import FileUpload from '../components/FileUpload'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useAppUser } from '../lib/user-context'
+import { buildInstallmentSchedule } from '../lib/installments'
 
 interface Lancamento {
   id: number
@@ -286,6 +287,21 @@ export default function FinanceiroPage() {
     [formData.conta_id, contaById]
   )
   const isFormCartao = isCartaoTipo(selectedFormConta?.tipo)
+  const installmentCount = Number(formData.total_parcelas)
+  const installmentSchedule = useMemo(() => {
+    if (editingId || !Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 12) return []
+    if (!formData.data_vencimento) return []
+    try {
+      return buildInstallmentSchedule(
+        Number(formData.valor_principal),
+        installmentCount,
+        formData.data_vencimento,
+        isFormCartao ? selectedFormConta?.dia_vencimento : null
+      )
+    } catch {
+      return []
+    }
+  }, [editingId, installmentCount, formData.valor_principal, formData.data_vencimento, isFormCartao, selectedFormConta?.dia_vencimento])
 
   const periodOptions: { value: PeriodOption; label: string }[] = [
     { value: 'hoje', label: 'Hoje' },
@@ -402,7 +418,11 @@ export default function FinanceiroPage() {
         data_vencimento: vencimentoCalculado || prev.data_vencimento,
       }))
     } else {
-      setFormData((prev) => ({ ...prev, conta_id: newContaId, total_parcelas: '1' }))
+      setFormData((prev) => ({
+        ...prev,
+        conta_id: newContaId,
+        data_vencimento: prev.data_lancamento || prev.data_vencimento,
+      }))
     }
   }
 
@@ -426,6 +446,11 @@ export default function FinanceiroPage() {
         setSaveError('Informe a data de vencimento.')
         return
       }
+      const totalParcelas = editingId ? 1 : Number(formData.total_parcelas)
+      if (!Number.isInteger(totalParcelas) || totalParcelas < 1 || totalParcelas > 12) {
+        setSaveError('O número de parcelas deve ser um inteiro entre 1 e 12.')
+        return
+      }
 
       const body = {
         empresa_id: appUser.empresa_id,
@@ -440,7 +465,7 @@ export default function FinanceiroPage() {
         valor_principal: valorPrincipal,
         juros: parseFloat(formData.juros) || 0,
         acrecimos: parseFloat(formData.acrecimos) || 0,
-        total_parcelas: !editingId && isFormCartao ? parseInt(formData.total_parcelas, 10) || 1 : 1,
+        total_parcelas: totalParcelas,
         dia_vencimento_cartao: isFormCartao ? selectedFormConta?.dia_vencimento || null : null,
         data_lancamento: formData.data_lancamento,
         data_vencimento: formData.data_vencimento,
@@ -486,6 +511,7 @@ export default function FinanceiroPage() {
       juros: '0',
       acrecimos: '0',
       total_parcelas: '1',
+      parcelas_select: '1',
       data_lancamento: new Date().toISOString().split('T')[0],
       data_vencimento: new Date().toISOString().split('T')[0],
       data_pagamento: '',
@@ -508,6 +534,7 @@ export default function FinanceiroPage() {
       juros: lanc.juros?.toString() || '0',
       acrecimos: lanc.acrecimos?.toString() || '0',
       total_parcelas: lanc.total_parcelas?.toString() || '1',
+      parcelas_select: lanc.total_parcelas?.toString() || '1',
       data_lancamento: lanc.data_lancamento?.split('T')[0] || '',
       data_vencimento: lanc.data_vencimento?.split('T')[0] || '',
       data_pagamento: lanc.data_pagamento?.split('T')[0] || '',
@@ -1324,72 +1351,77 @@ export default function FinanceiroPage() {
                   </Select>
                 </FormControl>
               </Grid>
-              {!editingId && isFormCartao && (
+              {!editingId && (
                 <Grid item xs={12} sm={4}>
                   <FormControl fullWidth size="small">
-                    <InputLabel>Parcelas no Cartão</InputLabel>
+                    <InputLabel>Número de parcelas</InputLabel>
                     <Select
-                      value={formData.total_parcelas}
-                      label="Parcelas no Cartão"
+                      value={formData.parcelas_select}
+                      label="Número de parcelas"
                       onChange={(e) => {
-                        const selected = e.target.value
+                        const selected = String(e.target.value)
                         setFormData((prev) => ({
                           ...prev,
                           parcelas_select: selected,
-                          total_parcelas: selected,
+                          total_parcelas: selected === 'personalizado'
+                            ? (Number(prev.total_parcelas) > 1 ? prev.total_parcelas : '7')
+                            : selected,
                         }))
-                        // Trigger preview calculation
-                        if (selected !== 'personalizado' && selected !== '') {
-                          const numParcelas = parseInt(selected, 10)
-                          const valorPrincipal = parseFloat(formData.valor_principal || 0)
-                          if (!isNaN(valorPrincipal) && valorPrincipal > 0) {
-                            // Calculate installment values
-                            const valorBase = Math.floor((valorPrincipal / numParcelas) * 100) / 100
-                            const diffCentavos = Math.round((valorPrincipal - valorBase * numParcelas) * 100) / 100
-                            const primeiraParcela = Number((valorBase + diffCentavos).toFixed(2))
-                            const outrasParcelas = valorBase
-                            // Calculate due dates
-                            const conta = contaById.get(parseInt(formData.conta_id, 10) || 0)
-                            let datasVencimento = []
-                            if (conta && conta.dia_vencimento) {
-                              const dataLanc = formData.data_lancamento
-                              for (let i = 0; i < numParcelas; i++) {
-                                const dataVenc = addMonthsToDateStr(dataLanc, i, conta.dia_vencimento)
-                                datasVencimento.push(dataVenc)
-                              }
-                            } else {
-                              // Fallback: same day next months
-                              const [y, m, d] = dataLanc.split('-').map(Number)
-                              for (let i = 0; i < numParcelas; i++) {
-                                const targetMonth = m + i
-                                const targetYear = y + Math.floor((targetMonth - 1) / 12)
-                                const targetMonthNum = ((targetMonth - 1) % 12) + 1
-                                const lastDay = new Date(targetYear, targetMonthNum + 1, 0).getDate()
-                                const day = Math.min(d, lastDay)
-                                datasVencimento.push(`${targetYear}-${String(targetMonthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
-                              }
-                            }
-                            // Store calculated data for preview
-                            setFormData((prev) => ({
-                              ...prev,
-                              valor_parcela_base: valorBase,
-                              diferenca_centavos: diffCentavos,
-                              primeira_parcela: primeiraParcela,
-                              outras_parcelas: outrasParcelas,
-                              datas_vencimento: datasVencimento,
-                            }))
-                          }
-                        } else if (selected === 'personalizado') {
-                          // Personalized count - keep total_parcelas as is for manual input
-                        }
                       }}
                     >
-[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "personalizado"].map((p) =>                        <MenuItem key={p} value={String(p)}>
-                          {p === 1 ? '1x (À vista na fatura)' : `${p}x mensais`}
+                      {[1, 2, 3, 4, 5, 6, 10, 12].map((count) => (
+                        <MenuItem key={count} value={String(count)}>
+                          {count === 1 ? '1x (à vista)' : `${count}x`}
                         </MenuItem>
                       ))}
+                      <MenuItem value="personalizado">Personalizado (1 a 12x)</MenuItem>
                     </Select>
                   </FormControl>
+                </Grid>
+              )}
+              {!editingId && formData.parcelas_select === 'personalizado' && (
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="number"
+                    label="Quantidade de parcelas"
+                    value={formData.total_parcelas}
+                    inputProps={{ min: 1, max: 12, step: 1 }}
+                    error={!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 12}
+                    helperText="Escolha um número inteiro entre 1 e 12."
+                    onChange={(e) => setFormData((prev) => ({ ...prev, total_parcelas: e.target.value }))}
+                  />
+                </Grid>
+              )}
+              {!editingId && isFormCartao && (
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary">
+                    Vencimento do cartão: dia {selectedFormConta?.dia_vencimento || 'não informado'}
+                    {selectedFormConta?.dia_fechamento ? ` · fechamento no dia ${selectedFormConta.dia_fechamento}` : ''}
+                  </Typography>
+                </Grid>
+              )}
+              {!editingId && installmentCount > 1 && installmentSchedule.length > 0 && (
+                <Grid item xs={12}>
+                  <Alert severity="info">
+                    <AlertTitle>
+                      Parcelamento em {installmentSchedule.length}x de {formatBRL(installmentSchedule[0].amount)}
+                    </AlertTitle>
+                    <Typography variant="body2">
+                      Total: {formatBRL(Number(formData.valor_principal))}. As datas e valores abaixo serão gravados:
+                    </Typography>
+                    <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {installmentSchedule.map((installment) => (
+                        <Chip
+                          key={installment.number}
+                          size="small"
+                          variant="outlined"
+                          label={`${installment.number}/${installmentSchedule.length}: ${formatBRL(installment.amount)} · ${new Date(`${installment.dueDate}T00:00:00`).toLocaleDateString('pt-BR')}`}
+                        />
+                      ))}
+                    </Box>
+                  </Alert>
                 </Grid>
               )}
               <Grid item xs={12} sm={4}>
@@ -1438,7 +1470,7 @@ export default function FinanceiroPage() {
                       data_vencimento:
                         isFormCartao && selectedFormConta
                           ? calcularVencimentoFatura(novaData, selectedFormConta.dia_vencimento, selectedFormConta.dia_fechamento)
-                          : prev.data_vencimento,
+                          : novaData,
                     }))
                   }}
                   InputLabelProps={{ shrink: true }}
