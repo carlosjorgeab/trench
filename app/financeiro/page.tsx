@@ -136,6 +136,7 @@ export default function FinanceiroPage() {
     juros: '0',
     acrecimos: '0',
     total_parcelas: '1',
+    parcelas_select: '1',
     data_lancamento: new Date().toISOString().split('T')[0],
     data_vencimento: new Date().toISOString().split('T')[0],
     data_pagamento: '',
@@ -1330,10 +1331,60 @@ export default function FinanceiroPage() {
                     <Select
                       value={formData.total_parcelas}
                       label="Parcelas no Cartão"
-                      onChange={(e) => setFormData({ ...formData, total_parcelas: e.target.value })}
+                      onChange={(e) => {
+                        const selected = e.target.value
+                        setFormData((prev) => ({
+                          ...prev,
+                          parcelas_select: selected,
+                          total_parcelas: selected,
+                        }))
+                        // Trigger preview calculation
+                        if (selected !== 'personalizado' && selected !== '') {
+                          const numParcelas = parseInt(selected, 10)
+                          const valorPrincipal = parseFloat(formData.valor_principal || 0)
+                          if (!isNaN(valorPrincipal) && valorPrincipal > 0) {
+                            // Calculate installment values
+                            const valorBase = Math.floor((valorPrincipal / numParcelas) * 100) / 100
+                            const diffCentavos = Math.round((valorPrincipal - valorBase * numParcelas) * 100) / 100
+                            const primeiraParcela = Number((valorBase + diffCentavos).toFixed(2))
+                            const outrasParcelas = valorBase
+                            // Calculate due dates
+                            const conta = contaById.get(parseInt(formData.conta_id, 10) || 0)
+                            let datasVencimento = []
+                            if (conta && conta.dia_vencimento) {
+                              const dataLanc = formData.data_lancamento
+                              for (let i = 0; i < numParcelas; i++) {
+                                const dataVenc = addMonthsToDateStr(dataLanc, i, conta.dia_vencimento)
+                                datasVencimento.push(dataVenc)
+                              }
+                            } else {
+                              // Fallback: same day next months
+                              const [y, m, d] = dataLanc.split('-').map(Number)
+                              for (let i = 0; i < numParcelas; i++) {
+                                const targetMonth = m + i
+                                const targetYear = y + Math.floor((targetMonth - 1) / 12)
+                                const targetMonthNum = ((targetMonth - 1) % 12) + 1
+                                const lastDay = new Date(targetYear, targetMonthNum + 1, 0).getDate()
+                                const day = Math.min(d, lastDay)
+                                datasVencimento.push(`${targetYear}-${String(targetMonthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+                              }
+                            }
+                            // Store calculated data for preview
+                            setFormData((prev) => ({
+                              ...prev,
+                              valor_parcela_base: valorBase,
+                              diferenca_centavos: diffCentavos,
+                              primeira_parcela: primeiraParcela,
+                              outras_parcelas: outrasParcelas,
+                              datas_vencimento: datasVencimento,
+                            }))
+                          }
+                        } else if (selected === 'personalizado') {
+                          // Personalized count - keep total_parcelas as is for manual input
+                        }
+                      }}
                     >
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24].map((p) => (
-                        <MenuItem key={p} value={String(p)}>
+[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "personalizado"].map((p) =>                        <MenuItem key={p} value={String(p)}>
                           {p === 1 ? '1x (À vista na fatura)' : `${p}x mensais`}
                         </MenuItem>
                       ))}
