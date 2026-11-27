@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS lancamentos (
     data_vencimento TIMESTAMP NOT NULL,
     data_pagamento TIMESTAMP,
     status VARCHAR(20) DEFAULT 'pendente',
+    parcela_atual INTEGER DEFAULT 1,
+    total_parcelas INTEGER DEFAULT 1,
+    grupo_parcelamento_id VARCHAR(64),
+    fatura_referencia VARCHAR(7),
+    conta_pagamento_id INTEGER,
     anexos TEXT[],
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -78,7 +83,13 @@ CREATE TABLE IF NOT EXISTS contas (
     id SERIAL PRIMARY KEY,
     empresa_id INTEGER REFERENCES empresas(id),
     nome VARCHAR(255) NOT NULL,
-    tipo VARCHAR(50),
+    tipo VARCHAR(50) DEFAULT 'bancaria',
+    limite_cartao DECIMAL(15,2),
+    dia_vencimento INTEGER,
+    dia_fechamento INTEGER,
+    limite_conta DECIMAL(15,2),
+    taxa_juros_conta DECIMAL(6,2),
+    data_vencimento_limite DATE,
     ativo BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT NOW()
 );

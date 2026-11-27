@@ -90,6 +90,11 @@ interface BankAccount {
   agency: string
   account: string
   balance: number
+  limiteCartao?: number | null
+  diaVencimento?: number | null
+  limiteConta?: number | null
+  taxaJurosConta?: number | null
+  dataVencimentoLimite?: string | null
   color: string
   badge: string
 }
@@ -1049,7 +1054,15 @@ export default function DashboardPage() {
                               />
                             </Box>
                           }
-                          secondary={`Ag: ${banco.agency} &bull; CC: ${banco.account}`}
+                          secondary={
+                            banco.type === 'cartao_credito' || banco.type === 'cartao'
+                              ? `Limite: ${formatMoney(banco.limiteCartao || 0)}${banco.diaVencimento ? ` • Venc. dia ${String(banco.diaVencimento).padStart(2, '0')}` : ''}`
+                              : banco.limiteConta != null && banco.limiteConta > 0
+                                ? `Limite: ${formatMoney(banco.limiteConta)}${banco.taxaJurosConta != null ? ` (${banco.taxaJurosConta}% a.m.)` : ''}${banco.dataVencimentoLimite ? ` • Venc. ${new Date(`${banco.dataVencimentoLimite.split('T')[0]}T12:00:00`).toLocaleDateString('pt-BR')}` : ''}`
+                                : banco.agency || banco.account
+                                  ? `Ag: ${banco.agency} • CC: ${banco.account}`
+                                  : 'Conta Bancária Ativa'
+                          }
                         />
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                           {formatMoney(banco.balance)}

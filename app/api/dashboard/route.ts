@@ -94,24 +94,54 @@ async function getFinancialSummary(empresaId: number) {
 async function getBankAccounts(empresaId: number) {
   const { data, error } = await supabase
     .from('contas')
-    .select('id, nome, tipo, ativo, created_at')
+    .select('id, nome, tipo, limite_cartao, dia_vencimento, limite_conta, taxa_juros_conta, data_vencimento_limite, ativo, created_at')
     .eq('empresa_id', empresaId)
     .eq('ativo', true)
 
   if (error) throw error
 
+  // Buscar lançamentos para calcular saldo bancário e limite utilizado dos cartões
+  const { data: lancs } = await supabase
+    .from('lancamentos')
+    .select('conta_id, tipo, valor_principal, juros, acrecimos, status')
+    .eq('empresa_id', empresaId)
+
+  const utilizadoCartaoMap = new Map<number, number>()
+  const saldoBancarioMap = new Map<number, number>()
+  for (const l of lancs || []) {
+    if (!l.conta_id) continue
+    const v = Number(l.valor_principal || 0) + Number(l.juros || 0) + Number(l.acrecimos || 0)
+    if (l.status === 'pendente' || l.status === 'vencido') {
+      utilizadoCartaoMap.set(l.conta_id, (utilizadoCartaoMap.get(l.conta_id) || 0) + v)
+    }
+    if (l.status === 'pago') {
+      const delta = l.tipo === 'credito' ? v : -v
+      saldoBancarioMap.set(l.conta_id, (saldoBancarioMap.get(l.conta_id) || 0) + delta)
+    }
+  }
+
   return (data || []).map((conta, index) => {
     const colors = ['#ea580c', '#dc2626', '#b91c1c', '#0284c7', '#059669', '#7c3aed']
-    const badges = ['Principal', 'Investimento', 'Operacional', 'Caixa', 'Poupança', 'Outros']
+    const isCartao = conta.tipo === 'cartao_credito' || conta.tipo === 'cartao'
+    const limiteCartao = Number(conta.limite_cartao || 0)
+    const utilizadoCartao = utilizadoCartaoMap.get(conta.id) || 0
+    const disponivelCartao = Math.max(0, limiteCartao - utilizadoCartao)
+    const saldoBancario = saldoBancarioMap.get(conta.id) || 0
+
     return {
       id: conta.id,
       name: conta.nome,
-      type: conta.tipo || 'Conta Corrente',
+      type: conta.tipo || 'bancaria',
       agency: '',
       account: '',
-      balance: 0,
+      balance: isCartao ? disponivelCartao : saldoBancario,
+      limiteCartao: isCartao ? limiteCartao : null,
+      diaVencimento: isCartao ? conta.dia_vencimento : null,
+      limiteConta: !isCartao && conta.limite_conta != null ? Number(conta.limite_conta) : null,
+      taxaJurosConta: !isCartao && conta.taxa_juros_conta != null ? Number(conta.taxa_juros_conta) : null,
+      dataVencimentoLimite: !isCartao ? conta.data_vencimento_limite || null : null,
       color: colors[index % colors.length],
-      badge: badges[index % badges.length],
+      badge: isCartao ? 'Cartão' : 'Bancária',
     }
   })
 }
