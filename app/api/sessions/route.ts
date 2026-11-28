@@ -32,6 +32,33 @@ export async function POST(request: NextRequest) {
         console.error('Erro ao revogar sessões antigas:', revokeError)
       }
 
+      const { data: existingSession, error: existingSessionError } = await supabase
+        .from('user_sessions')
+        .select('id')
+        .eq('user_id', user_id)
+        .eq('session_id', session_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (existingSessionError) throw existingSessionError
+
+      if (existingSession) {
+        const { error: updateError } = await supabase
+          .from('user_sessions')
+          .update({
+            device_info: device_info || null,
+            is_active: true,
+            revoked_at: null,
+            last_activity: new Date().toISOString(),
+          })
+          .eq('user_id', user_id)
+          .eq('session_id', session_id)
+
+        if (updateError) throw updateError
+        return NextResponse.json({ success: true, data: existingSession })
+      }
+
       // Inserir nova sessão
       const { data, error } = await supabase
         .from('user_sessions')
@@ -56,6 +83,8 @@ export async function POST(request: NextRequest) {
         .select('id, is_active, session_id')
         .eq('user_id', user_id)
         .eq('session_id', session_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
       if (error) throw error
@@ -86,6 +115,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     )
   } catch (error: any) {
+    console.error('Erro ao gerenciar sessão:', error)
     return NextResponse.json(
       { success: false, error: error?.message || 'Erro ao gerenciar sessão' },
       { status: 500 }

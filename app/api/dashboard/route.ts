@@ -33,6 +33,22 @@ function applyAccountAndCostCenterFilters(query: any, filters: DashboardFilters)
   return query
 }
 
+async function getNamesById(tableName: string, empresaId: number, ids: number[]) {
+  const names = new Map<number, string>()
+  const uniqueIds = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))]
+  if (!uniqueIds.length) return names
+
+  const { data, error } = await (supabase as any)
+    .from(tableName)
+    .select('id, nome')
+    .eq('empresa_id', empresaId)
+    .in('id', uniqueIds)
+
+  if (error) throw error
+  for (const row of data || []) names.set(Number(row.id), row.nome)
+  return names
+}
+
 async function getEmpresaId(request: NextRequest): Promise<{ empresaId: number | null; isSystemAdmin: boolean }> {
   const { searchParams } = new URL(request.url)
   const empresaId = searchParams.get('empresa_id')
@@ -229,7 +245,7 @@ async function getCashFlowHistory(empresaId: number, filters: DashboardFilters) 
 async function getCategoryExpenses(empresaId: number, filters: DashboardFilters) {
   let query: any = supabase
     .from('lancamentos')
-    .select('valor_principal, juros, acrecimos, data_lancamento, centros_custos(nome)')
+    .select('valor_principal, juros, acrecimos, data_lancamento, centro_custo_id')
     .eq('empresa_id', empresaId)
     .eq('tipo', 'debito')
   query = applyAccountAndCostCenterFilters(query, filters)
@@ -237,6 +253,11 @@ async function getCategoryExpenses(empresaId: number, filters: DashboardFilters)
 
   if (error) throw error
 
+  const costCenterNames = await getNamesById(
+    'centros_custos',
+    empresaId,
+    ((lancamentos || []) as any[]).map((l) => Number(l.centro_custo_id))
+  )
   const categoryMap: Record<string, number> = {}
   let total = 0
   const { start, end } = getPeriodRange(filters.period)
@@ -245,8 +266,9 @@ async function getCategoryExpenses(empresaId: number, filters: DashboardFilters)
     const date = new Date(l.data_lancamento)
     if (date < start || date > end) continue
     const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
-    const catName = (l as any).centros_custos?.nome || 'Sem Centro de Custo'
-    categoryMap[catName] = (categoryMap[catName] || 0) + valorTotal
+    const centerId = Number(l.centro_custo_id)
+    const centerName = costCenterNames.get(centerId) || 'Sem Centro de Custo'
+    categoryMap[centerName] = (categoryMap[centerName] || 0) + valorTotal
     total += valorTotal
   }
 
@@ -280,13 +302,8 @@ async function getRecentTransactions(empresaId: number, filters: DashboardFilter
       status,
       data_lancamento,
       categoria_id,
-      categorias(nome),
       conta_id,
-      contas(nome),
-      cliente_id,
-      clientes(nome),
-      fornecedor_id,
-      fornecedores(nome)
+      cliente_id
     `)
     .eq('empresa_id', empresaId)
   query = applyAccountAndCostCenterFilters(query, filters)
@@ -296,7 +313,14 @@ async function getRecentTransactions(empresaId: number, filters: DashboardFilter
 
   if (error) throw error
 
-  return ((data || []) as any[]).map((l: any) => {
+  const transactions = (data || []) as any[]
+  const [categoryNames, accountNames, clientNames] = await Promise.all([
+    getNamesById('categorias', empresaId, transactions.map((l) => Number(l.categoria_id))),
+    getNamesById('contas', empresaId, transactions.map((l) => Number(l.conta_id))),
+    getNamesById('clientes', empresaId, transactions.map((l) => Number(l.cliente_id))),
+  ])
+
+  return transactions.map((l: any) => {
     const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
     const date = new Date(l.data_lancamento)
     const today = new Date()
@@ -308,14 +332,12 @@ async function getRecentTransactions(empresaId: number, filters: DashboardFilter
     else if (isYesterday) dataStr = `Ontem, ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
     else dataStr = date.toLocaleDateString('pt-BR')
 
-    const cat = (l as any).categorias?.nome || 'Sem Categoria'
-    const conta = (l as any).contas?.nome || 'Conta não informada'
-    const cliente = (l as any).clientes?.nome
-    const fornecedor = (l as any).fornecedores?.nome
+    const cat = categoryNames.get(Number(l.categoria_id)) || 'Sem Categoria'
+    const conta = accountNames.get(Number(l.conta_id)) || 'Conta não informada'
+    const cliente = clientNames.get(Number(l.cliente_id))
 
     let descricao = l.observacao || `${l.tipo === 'credito' ? 'Recebimento' : 'Pagamento'}`
     if (cliente) descricao += ` - ${cliente}`
-    if (fornecedor) descricao += ` - ${fornecedor}`
 
     return {
       id: l.id,
