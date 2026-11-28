@@ -27,6 +27,10 @@ import {
   TableRow,
   LinearProgress,
   Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   useTheme,
   alpha,
   Skeleton,
@@ -79,8 +83,16 @@ interface Currency {
   code: string
   name: string
   value: number
-  variation: number
-  unit?: string
+  variation: number | null
+  unit: string
+  category: 'Brasil' | 'Forex' | 'Commodities'
+  source: string
+  updatedAt: string
+}
+
+interface FilterOption {
+  id: number
+  name: string
 }
 
 interface BankAccount {
@@ -143,7 +155,11 @@ export default function DashboardPage() {
     inadimplencia: 0,
   })
   const [currencies, setCurrencies] = useState<Currency[]>([])
+  const [marketUpdatedAt, setMarketUpdatedAt] = useState<string | null>(null)
+  const [marketWarning, setMarketWarning] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [accountOptions, setAccountOptions] = useState<FilterOption[]>([])
+  const [costCenterOptions, setCostCenterOptions] = useState<FilterOption[]>([])
   const [cashFlowHistory, setCashFlowHistory] = useState<CashFlowItem[]>([])
   const [categoryExpenses, setCategoryExpenses] = useState<CategoryExpense[]>([])
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
@@ -151,6 +167,9 @@ export default function DashboardPage() {
 
   const [hideValues, setHideValues] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState('mes')
+  const [selectedAccountId, setSelectedAccountId] = useState('')
+  const [selectedCostCenterId, setSelectedCostCenterId] = useState('')
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
   const formatMoney = (value: number) => {
     if (hideValues) return 'R$ ••••••••'
@@ -167,7 +186,10 @@ export default function DashboardPage() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`/api/dashboard?user_id=${appUser.id}`)
+      const params = new URLSearchParams({ user_id: appUser.id, period: selectedPeriod })
+      if (selectedAccountId) params.set('conta_id', selectedAccountId)
+      if (selectedCostCenterId) params.set('centro_custo_id', selectedCostCenterId)
+      const response = await fetch(`/api/dashboard?${params.toString()}`, { cache: 'no-store' })
       const result = await response.json()
       if (result.success && result.data) {
         setFinancialData(result.data.financialSummary)
@@ -175,6 +197,7 @@ export default function DashboardPage() {
         setCashFlowHistory(result.data.cashFlowHistory)
         setCategoryExpenses(result.data.categoryExpenses)
         setRecentTransactions(result.data.recentTransactions)
+        setLastUpdated(result.data.lastUpdated || new Date().toISOString())
       } else {
         setError(result.error || 'Erro ao carregar dashboard')
       }
@@ -186,16 +209,84 @@ export default function DashboardPage() {
     }
   }
 
+  const fetchMarketData = async () => {
+    try {
+      const response = await fetch('/api/mercado', { cache: 'no-store' })
+      const result = await response.json()
+      setCurrencies(result.quotes || [])
+      setMarketUpdatedAt(result.updatedAt || new Date().toISOString())
+      setMarketWarning(Boolean(result.failedSources))
+    } catch {
+      setCurrencies([])
+      setMarketUpdatedAt(null)
+      setMarketWarning(true)
+    }
+  }
+
+  const fetchFilterOptions = async () => {
+    if (!appUser?.empresa_id) return
+    try {
+      const [accountsResponse, centersResponse] = await Promise.all([
+        fetch(`/api/contas?empresa_id=${appUser.empresa_id}`, { cache: 'no-store' }),
+        fetch(`/api/centros-custos?empresa_id=${appUser.empresa_id}`, { cache: 'no-store' }),
+      ])
+      const [accountsResult, centersResult] = await Promise.all([accountsResponse.json(), centersResponse.json()])
+      if (accountsResult.success) {
+        setAccountOptions((accountsResult.data || [])
+          .filter((account: any) => account.ativo !== false)
+          .map((account: any) => ({ id: account.id, name: account.nome })))
+      }
+      if (centersResult.success) {
+        setCostCenterOptions((centersResult.data || [])
+          .filter((center: any) => center.ativo !== false)
+          .map((center: any) => ({ id: center.id, name: center.nome })))
+      }
+    } catch (fetchError) {
+      console.error('Erro ao carregar filtros do dashboard:', fetchError)
+    }
+  }
+
   const handleRefresh = () => {
     setRefreshing(true)
     fetchDashboardData()
+    fetchMarketData()
+  }
+
+  const formatMarketQuote = (quote: Currency) => {
+    if (quote.code === 'IBOV') return `${Math.round(quote.value).toLocaleString('pt-BR')} pts`
+    if (quote.unit === '% a.a.' || quote.unit === '%') return `${quote.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${quote.unit}`
+    if (quote.unit === 'R$/un.') return `R$ ${quote.value.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
+    return `${quote.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${quote.unit}`
   }
 
   useEffect(() => {
     if (!loadingAppUser) {
       fetchDashboardData()
     }
-  }, [appUser, loadingAppUser])
+  }, [appUser, loadingAppUser, selectedPeriod, selectedAccountId, selectedCostCenterId])
+
+  useEffect(() => {
+    if (!loadingAppUser && appUser?.empresa_id) fetchFilterOptions()
+  }, [appUser?.empresa_id, loadingAppUser])
+
+  useEffect(() => {
+    fetchMarketData()
+    const marketInterval = window.setInterval(fetchMarketData, 5 * 60 * 1000)
+    return () => window.clearInterval(marketInterval)
+  }, [])
+
+  useEffect(() => {
+    if (loadingAppUser || !appUser) return
+    const refreshInterval = window.setInterval(fetchDashboardData, 60 * 1000)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') fetchDashboardData()
+    }
+    window.addEventListener('focus', refreshWhenVisible)
+    return () => {
+      window.clearInterval(refreshInterval)
+      window.removeEventListener('focus', refreshWhenVisible)
+    }
+  }, [appUser, loadingAppUser, selectedPeriod, selectedAccountId, selectedCostCenterId])
 
   const maxCashValue = cashFlowHistory.length > 0
     ? Math.max(...cashFlowHistory.map((c) => Math.max(c.receitas, c.despesas)))
@@ -415,6 +506,52 @@ export default function DashboardPage() {
       }
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Paper
+          elevation={0}
+          aria-label="Cotações de mercado"
+          sx={{
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: `${config.borderRadius}px`,
+            bgcolor: 'background.paper',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Globe size={16} color={theme.palette.primary.main} />
+              <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>Mercados</Typography>
+              <Typography variant="caption" color="text.secondary">Brasil · Forex · Commodities</Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              {marketUpdatedAt ? `Atualizado ${new Date(marketUpdatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Cotações indisponíveis'}
+              {marketWarning ? ' · dados parciais' : ''}
+            </Typography>
+          </Box>
+          {currencies.length > 0 ? (
+            <Box className="market-ticker-viewport">
+              <Box className="market-ticker-track">
+                {[0, 1].flatMap((copy) => currencies.map((quote) => (
+                  <Box key={`${copy}-${quote.code}`} className="market-ticker-item" aria-hidden={copy === 1} title={`${quote.name} · fonte: ${quote.source}${quote.updatedAt ? ` · ${quote.updatedAt}` : ''}`}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>{quote.code}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{formatMarketQuote(quote)}</Typography>
+                    {quote.variation !== null && (
+                      <Typography variant="caption" sx={{ color: quote.variation >= 0 ? 'success.main' : 'error.main', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        {quote.variation > 0 ? '+' : ''}{quote.variation.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%
+                      </Typography>
+                    )}
+                    <Chip label={quote.category} size="small" variant="outlined" sx={{ height: 18, fontSize: '0.62rem' }} />
+                  </Box>
+                )))}
+              </Box>
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5 }}>
+              Não foi possível carregar as cotações agora. Atualização automática em 5 minutos.
+            </Typography>
+          )}
+        </Paper>
+
         {/* Barra Superior de Filtros e Seletores Globais */}
         <Paper
           elevation={0}
@@ -425,7 +562,7 @@ export default function DashboardPage() {
             borderColor: 'divider',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-start',
             flexWrap: 'wrap',
             gap: 2,
             bgcolor: 'background.paper',
@@ -440,7 +577,7 @@ export default function DashboardPage() {
                 { key: '7d', label: '7D' },
                 { key: 'mes', label: 'Este Mês' },
                 { key: 'trimestre', label: 'Trimestre' },
-                { key: 'ano', label: 'Ano 2026' },
+                { key: 'ano', label: 'Este Ano' },
               ].map((p) => (
                 <Chip
                   key={p.key}
@@ -463,27 +600,37 @@ export default function DashboardPage() {
 
           <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', lg: 'block' } }} />
 
-          {/* Taxas Econômicas Rápidas */}
-          <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 2 }}>
-            {currencies.map((curr) => (
-              <Box key={curr.code} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                  {curr.code}:
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>
-                  {curr.unit ? `${curr.value}${curr.unit}` : `R$ ${curr.value.toFixed(2)}`}
-                </Typography>
-                {curr.variation !== 0 && (
-                  <Chip
-                    label={`${curr.variation > 0 ? '+' : ''}${curr.variation}%`}
-                    size="small"
-                    color={curr.variation > 0 ? 'success' : 'error'}
-                    sx={{ height: 18, fontSize: '0.65rem', px: 0.2 }}
-                  />
-                )}
-              </Box>
-            ))}
-          </Box>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 190 } }}>
+            <InputLabel id="dashboard-account-filter-label">Conta bancária</InputLabel>
+            <Select
+              labelId="dashboard-account-filter-label"
+              value={selectedAccountId}
+              label="Conta bancária"
+              onChange={(event) => setSelectedAccountId(event.target.value)}
+            >
+              <MenuItem value="">Todas as contas</MenuItem>
+              {accountOptions.map((account) => <MenuItem key={account.id} value={String(account.id)}>{account.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 210 } }}>
+            <InputLabel id="dashboard-cost-center-filter-label">Centro de custo</InputLabel>
+            <Select
+              labelId="dashboard-cost-center-filter-label"
+              value={selectedCostCenterId}
+              label="Centro de custo"
+              onChange={(event) => setSelectedCostCenterId(event.target.value)}
+            >
+              <MenuItem value="">Todos os centros</MenuItem>
+              {costCenterOptions.map((center) => <MenuItem key={center.id} value={String(center.id)}>{center.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          {lastUpdated && (
+            <Typography variant="caption" color="text.secondary" sx={{ ml: { sm: 'auto' }, whiteSpace: 'nowrap' }}>
+              Financeiro atualizado {new Date(lastUpdated).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </Typography>
+          )}
         </Paper>
 
         {/* Banner Hero Executivo Elegante */}
@@ -521,7 +668,7 @@ export default function DashboardPage() {
           <Box sx={{ zIndex: 1, minWidth: 260 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
               <Typography variant="overline" sx={{ letterSpacing: '0.1em', fontWeight: 600, opacity: 0.85 }}>
-                SALDO TOTAL EM CONTA & INVESTIMENTOS
+                RESULTADO LÍQUIDO REALIZADO NO PERÍODO
               </Typography>
               <Chip
                 label={refreshing ? 'Atualizando...' : 'Atualizado'}
@@ -553,7 +700,7 @@ export default function DashboardPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <ArrowUpRight size={18} color="#86efac" />
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#86efac' }}>
-                  {financialData.lucroLiquido >= 0 ? '+' : ''}{((financialData.lucroLiquido / Math.abs(financialData.saldoTotal || 1)) * 100).toFixed(1)}% vs mês anterior
+                  {selectedPeriod === 'hoje' ? 'Hoje' : selectedPeriod === '7d' ? 'Últimos 7 dias' : selectedPeriod === 'trimestre' ? 'Este trimestre' : selectedPeriod === 'ano' ? 'Este ano' : 'Este mês'}
                 </Typography>
               </Box>
               <Typography variant="caption" sx={{ opacity: 0.75 }}>
@@ -651,13 +798,13 @@ export default function DashboardPage() {
 
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Chip
-                  label="+14.8%"
+                  label="Período filtrado"
                   size="small"
                   color="success"
                   sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }}
                 />
                 <Typography variant="caption" color="text.secondary">
-                  Meta atingida (108%)
+                  Recebimentos concluídos
                 </Typography>
               </Box>
             </Card>
@@ -699,13 +846,13 @@ export default function DashboardPage() {
 
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Chip
-                  label={financialData.despesasMes > 0 ? "-4.2%" : "0%"}
+                  label="Período filtrado"
                   size="small"
                   color="success"
                   sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }}
                 />
                 <Typography variant="caption" color="text.secondary">
-                  Economia de R$ 8.500
+                  Pagamentos concluídos
                 </Typography>
               </Box>
             </Card>
@@ -827,10 +974,10 @@ export default function DashboardPage() {
               >
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    Fluxo de Caixa Operacional (Últimos 6 Meses)
+                    Fluxo de Caixa ({selectedPeriod === 'hoje' ? 'Hoje' : selectedPeriod === '7d' ? 'Últimos 7 dias' : selectedPeriod === 'trimestre' ? 'Este trimestre' : selectedPeriod === 'ano' ? 'Este ano' : 'Este mês'})
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Comparativo histórico de Entradas vs Saídas com superávit contínuo
+                    Entradas e saídas dentro do período e dos filtros selecionados
                   </Typography>
                 </Box>
 
@@ -961,7 +1108,7 @@ export default function DashboardPage() {
                   Despesas por Centro de Custo
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                  Participação percentual nas despesas correntes
+                  Participação percentual no período filtrado
                 </Typography>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

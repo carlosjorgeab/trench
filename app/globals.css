@@ -131,3 +131,46 @@ body {
     margin-left: 280px;
   }
 }
+
+  .market-ticker-viewport {
+    display: flex;
+    overflow: hidden;
+    width: 100%;
+    min-height: 52px;
+    align-items: center;
+  }
+
+  .market-ticker-track {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 1.5rem;
+    min-width: max-content;
+    padding: 0.75rem 0.75rem 0.75rem 0;
+    animation: market-ticker-scroll 60s linear infinite;
+  }
+
+  .market-ticker-viewport:hover .market-ticker-track,
+  .market-ticker-viewport:focus-within .market-ticker-track {
+    animation-play-state: paused;
+  }
+
+  .market-ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding-right: 1.25rem;
+    border-right: 1px solid var(--md-sys-color-outline-variant);
+    white-space: nowrap;
+  }
+
+  @keyframes market-ticker-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .market-ticker-track {
+      animation: none;
+    }
+  }

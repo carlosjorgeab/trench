@@ -8,6 +8,31 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY || ''
 )
 
+interface DashboardFilters {
+  period: string
+  contaId: number | null
+  centroCustoId: number | null
+}
+
+function getPeriodRange(period: string) {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+
+  if (period === '7d') start.setDate(start.getDate() - 6)
+  else if (period === 'mes') start.setDate(1)
+  else if (period === 'trimestre') start.setMonth(Math.floor(now.getMonth() / 3) * 3, 1)
+  else if (period === 'ano') start.setMonth(0, 1)
+
+  return { start, end }
+}
+
+function applyAccountAndCostCenterFilters(query: any, filters: DashboardFilters) {
+  if (filters.contaId) query = query.eq('conta_id', filters.contaId)
+  if (filters.centroCustoId) query = query.eq('centro_custo_id', filters.centroCustoId)
+  return query
+}
+
 async function getEmpresaId(request: NextRequest): Promise<{ empresaId: number | null; isSystemAdmin: boolean }> {
   const { searchParams } = new URL(request.url)
   const empresaId = searchParams.get('empresa_id')
@@ -26,17 +51,18 @@ async function getEmpresaId(request: NextRequest): Promise<{ empresaId: number |
   return { empresaId: null, isSystemAdmin: false }
 }
 
-async function getFinancialSummary(empresaId: number) {
-  const { data: lancamentos, error } = await supabase
+async function getFinancialSummary(empresaId: number, filters: DashboardFilters) {
+  let query: any = supabase
     .from('lancamentos')
     .select('tipo, valor_principal, juros, acrecimos, status, data_lancamento, data_vencimento')
     .eq('empresa_id', empresaId)
+  query = applyAccountAndCostCenterFilters(query, filters)
+  const { data: lancamentos, error } = await query
 
   if (error) throw error
 
   const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+  const { start, end } = getPeriodRange(filters.period)
 
   let saldoTotal = 0
   let receitasMes = 0
@@ -51,12 +77,16 @@ async function getFinancialSummary(empresaId: number) {
     const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
     const dataLanc = new Date(l.data_lancamento)
     const dataVenc = new Date(l.data_vencimento)
-    const isCurrentMonth = dataLanc >= startOfMonth && dataLanc <= endOfMonth
+    const isInPeriod = dataLanc >= start && dataLanc <= end
+    const isDueInPeriod = dataVenc >= start && dataVenc <= end
+    const isRealized = l.status === 'pago' || l.status === 'recebido'
 
     if (l.tipo === 'credito') {
-      saldoTotal += valorTotal
-      if (isCurrentMonth) receitasMes += valorTotal
-      if (l.status === 'pendente' || l.status === 'agendado') {
+      if (isInPeriod && isRealized) {
+        saldoTotal += valorTotal
+        receitasMes += valorTotal
+      }
+      if (isDueInPeriod && (l.status === 'pendente' || l.status === 'agendado')) {
         contasReceber += valorTotal
         contasReceberQtd++
         if (dataVenc < now && l.status === 'pendente') {
@@ -64,9 +94,11 @@ async function getFinancialSummary(empresaId: number) {
         }
       }
     } else {
-      saldoTotal -= valorTotal
-      if (isCurrentMonth) despesasMes += valorTotal
-      if (l.status === 'pendente' || l.status === 'agendado') {
+      if (isInPeriod && isRealized) {
+        saldoTotal -= valorTotal
+        despesasMes += valorTotal
+      }
+      if (isDueInPeriod && (l.status === 'pendente' || l.status === 'agendado')) {
         contasPagar += valorTotal
         contasPagarQtd++
       }
@@ -91,20 +123,24 @@ async function getFinancialSummary(empresaId: number) {
   }
 }
 
-async function getBankAccounts(empresaId: number) {
-  const { data, error } = await supabase
+async function getBankAccounts(empresaId: number, filters: DashboardFilters) {
+  let accountsQuery: any = supabase
     .from('contas')
     .select('id, nome, tipo, limite_cartao, dia_vencimento, limite_conta, taxa_juros_conta, data_vencimento_limite, ativo, created_at')
     .eq('empresa_id', empresaId)
     .eq('ativo', true)
+  if (filters.contaId) accountsQuery = accountsQuery.eq('id', filters.contaId)
+  const { data, error } = await accountsQuery
 
   if (error) throw error
 
   // Buscar lançamentos para calcular saldo bancário e limite utilizado dos cartões
-  const { data: lancs } = await supabase
+  let lancementsQuery: any = supabase
     .from('lancamentos')
     .select('conta_id, tipo, valor_principal, juros, acrecimos, status')
     .eq('empresa_id', empresaId)
+  lancementsQuery = applyAccountAndCostCenterFilters(lancementsQuery, filters)
+  const { data: lancs } = await lancementsQuery
 
   const utilizadoCartaoMap = new Map<number, number>()
   const saldoBancarioMap = new Map<number, number>()
@@ -120,7 +156,7 @@ async function getBankAccounts(empresaId: number) {
     }
   }
 
-  return (data || []).map((conta, index) => {
+  return ((data || []) as any[]).map((conta: any, index: number) => {
     const colors = ['#ea580c', '#dc2626', '#b91c1c', '#0284c7', '#059669', '#7c3aed']
     const isCartao = conta.tipo === 'cartao_credito' || conta.tipo === 'cartao'
     const limiteCartao = Number(conta.limite_cartao || 0)
@@ -146,24 +182,32 @@ async function getBankAccounts(empresaId: number) {
   })
 }
 
-async function getCashFlowHistory(empresaId: number) {
-  const { data: lancamentos, error } = await supabase
+async function getCashFlowHistory(empresaId: number, filters: DashboardFilters) {
+  let query: any = supabase
     .from('lancamentos')
     .select('tipo, valor_principal, juros, acrecimos, data_lancamento')
     .eq('empresa_id', empresaId)
+  query = applyAccountAndCostCenterFilters(query, filters)
+  const { data: lancamentos, error } = await query
 
   if (error) throw error
 
-  const monthlyData: Record<string, { receitas: number; despesas: number }> = {}
+  const monthlyData: Record<string, { receitas: number; despesas: number; sortKey: number }> = {}
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+  const { start, end } = getPeriodRange(filters.period)
 
   for (const l of lancamentos || []) {
     const date = new Date(l.data_lancamento)
-    const key = `${months[date.getMonth()]}/${date.getFullYear()}`
+    if (date < start || date > end) continue
+    const key = filters.period === 'hoje'
+      ? 'Hoje'
+      : filters.period === '7d'
+        ? date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+        : `${months[date.getMonth()]}/${date.getFullYear()}`
     const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
 
     if (!monthlyData[key]) {
-      monthlyData[key] = { receitas: 0, despesas: 0 }
+      monthlyData[key] = { receitas: 0, despesas: 0, sortKey: date.getTime() }
     }
 
     if (l.tipo === 'credito') {
@@ -173,35 +217,35 @@ async function getCashFlowHistory(empresaId: number) {
     }
   }
 
-  const sortedKeys = Object.keys(monthlyData).sort((a, b) => {
-    const [ma, ya] = a.split('/')
-    const [mb, yb] = b.split('/')
-    return parseInt(ya) * 12 + months.indexOf(ma) - (parseInt(yb) * 12 + months.indexOf(mb))
-  })
+  const sortedKeys = Object.keys(monthlyData).sort((a, b) => monthlyData[a].sortKey - monthlyData[b].sortKey)
 
   return sortedKeys.slice(-6).map((mes) => ({
-    mes: mes.split('/')[0],
+    mes: filters.period === 'hoje' || filters.period === '7d' ? mes : mes.split('/')[0],
     receitas: monthlyData[mes].receitas,
     despesas: monthlyData[mes].despesas,
   }))
 }
 
-async function getCategoryExpenses(empresaId: number) {
-  const { data: lancamentos, error } = await supabase
+async function getCategoryExpenses(empresaId: number, filters: DashboardFilters) {
+  let query: any = supabase
     .from('lancamentos')
-    .select('valor_principal, juros, acrecimos, categoria_id, categorias!inner(nome)')
+    .select('valor_principal, juros, acrecimos, data_lancamento, centros_custos(nome)')
     .eq('empresa_id', empresaId)
     .eq('tipo', 'debito')
+  query = applyAccountAndCostCenterFilters(query, filters)
+  const { data: lancamentos, error } = await query
 
   if (error) throw error
 
   const categoryMap: Record<string, number> = {}
   let total = 0
+  const { start, end } = getPeriodRange(filters.period)
 
   for (const l of lancamentos || []) {
+    const date = new Date(l.data_lancamento)
+    if (date < start || date > end) continue
     const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
-    // Access the joined category name
-    const catName = (l as any).categorias?.nome || 'Sem Categoria'
+    const catName = (l as any).centros_custos?.nome || 'Sem Centro de Custo'
     categoryMap[catName] = (categoryMap[catName] || 0) + valorTotal
     total += valorTotal
   }
@@ -223,8 +267,8 @@ async function getCategoryExpenses(empresaId: number) {
     }))
 }
 
-async function getRecentTransactions(empresaId: number, limit = 10) {
-  const { data, error } = await supabase
+async function getRecentTransactions(empresaId: number, filters: DashboardFilters, limit = 10) {
+  let query: any = supabase
     .from('lancamentos')
     .select(`
       id,
@@ -236,21 +280,23 @@ async function getRecentTransactions(empresaId: number, limit = 10) {
       status,
       data_lancamento,
       categoria_id,
-      categorias!inner(nome),
+      categorias(nome),
       conta_id,
-      contas!inner(nome),
+      contas(nome),
       cliente_id,
-      clientes!inner(nome),
+      clientes(nome),
       fornecedor_id,
-      fornecedores!inner(nome)
+      fornecedores(nome)
     `)
     .eq('empresa_id', empresaId)
-    .order('data_lancamento', { ascending: false })
-    .limit(limit)
+  query = applyAccountAndCostCenterFilters(query, filters)
+  const { start, end } = getPeriodRange(filters.period)
+  query = query.gte('data_lancamento', start.toISOString()).lte('data_lancamento', end.toISOString())
+  const { data, error } = await query.order('data_lancamento', { ascending: false }).limit(limit)
 
   if (error) throw error
 
-  return (data || []).map((l) => {
+  return ((data || []) as any[]).map((l: any) => {
     const valorTotal = Number(l.valor_principal) + Number(l.juros || 0) + Number(l.acrecimos || 0)
     const date = new Date(l.data_lancamento)
     const today = new Date()
@@ -288,6 +334,16 @@ async function getRecentTransactions(empresaId: number, limit = 10) {
 export async function GET(request: NextRequest) {
   try {
     const { empresaId, isSystemAdmin } = await getEmpresaId(request)
+    const { searchParams } = new URL(request.url)
+    const period = searchParams.get('period') || 'mes'
+    const allowedPeriods = new Set(['hoje', '7d', 'mes', 'trimestre', 'ano'])
+    const contaIdValue = searchParams.get('conta_id')
+    const centroCustoIdValue = searchParams.get('centro_custo_id')
+    const filters: DashboardFilters = {
+      period: allowedPeriods.has(period) ? period : 'mes',
+      contaId: contaIdValue && /^\d+$/.test(contaIdValue) ? Number(contaIdValue) : null,
+      centroCustoId: centroCustoIdValue && /^\d+$/.test(centroCustoIdValue) ? Number(centroCustoIdValue) : null,
+    }
 
     if (!empresaId && !isSystemAdmin) {
       return NextResponse.json(
@@ -300,23 +356,23 @@ export async function GET(request: NextRequest) {
     const effectiveEmpresaId = empresaId || 0
 
     // Run each query independently to isolate errors
-    const financialSummaryPromise = getFinancialSummary(effectiveEmpresaId).catch((e) => {
+    const financialSummaryPromise = getFinancialSummary(effectiveEmpresaId, filters).catch((e) => {
       console.error('getFinancialSummary error:', e)
       return null
     })
-    const bankAccountsPromise = getBankAccounts(effectiveEmpresaId).catch((e) => {
+    const bankAccountsPromise = getBankAccounts(effectiveEmpresaId, filters).catch((e) => {
       console.error('getBankAccounts error:', e)
       return []
     })
-    const cashFlowHistoryPromise = getCashFlowHistory(effectiveEmpresaId).catch((e) => {
+    const cashFlowHistoryPromise = getCashFlowHistory(effectiveEmpresaId, filters).catch((e) => {
       console.error('getCashFlowHistory error:', e)
       return []
     })
-    const categoryExpensesPromise = getCategoryExpenses(effectiveEmpresaId).catch((e) => {
+    const categoryExpensesPromise = getCategoryExpenses(effectiveEmpresaId, filters).catch((e) => {
       console.error('getCategoryExpenses error:', e)
       return []
     })
-    const recentTransactionsPromise = getRecentTransactions(effectiveEmpresaId).catch((e) => {
+    const recentTransactionsPromise = getRecentTransactions(effectiveEmpresaId, filters).catch((e) => {
       console.error('getRecentTransactions error:', e)
       return []
     })
@@ -344,8 +400,9 @@ export async function GET(request: NextRequest) {
         cashFlowHistory: cashFlowHistory || [],
         categoryExpenses: categoryExpenses || [],
         recentTransactions: recentTransactions || [],
+        lastUpdated: new Date().toISOString(),
       }
-    })
+    }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
     console.error('Error fetching dashboard data:', error)
     return NextResponse.json(
