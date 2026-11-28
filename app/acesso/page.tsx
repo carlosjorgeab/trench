@@ -63,6 +63,8 @@ import {
   Sparkles,
   Send,
   RefreshCw,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { useThemeConfig } from '../lib/theme-config-context'
 
@@ -233,10 +235,12 @@ export default function AcessoPage() {
     nome: '',
     email: '',
     password: '',
+    passwordConfirmation: '',
     perfil: 'usuario',
     empresa_id: '',
     ativo: true,
   })
+  const [showUserPassword, setShowUserPassword] = useState(false)
 
   // Company Request Dialog State
   const [requestDialogOpen, setRequestDialogOpen] = useState(false)
@@ -320,6 +324,7 @@ export default function AcessoPage() {
         nome: userToEdit.nome,
         email: userToEdit.email,
         password: '',
+        passwordConfirmation: '',
         perfil: userToEdit.perfil,
         empresa_id: userToEdit.empresa_id?.toString() || '',
         ativo: userToEdit.ativo,
@@ -361,6 +366,7 @@ export default function AcessoPage() {
         nome: '',
         email: '',
         password: '',
+        passwordConfirmation: '',
         perfil: 'usuario',
         empresa_id: companies[0]?.id?.toString() || '',
         ativo: true,
@@ -378,6 +384,14 @@ export default function AcessoPage() {
     }
     if (!editingUserId && !userForm.password) {
       showSnackbar('Senha é obrigatória para novo usuário.', 'error')
+      return
+    }
+    if (userForm.password && userForm.password.length < 6) {
+      showSnackbar('A senha deve ter pelo menos 6 caracteres.', 'error')
+      return
+    }
+    if (userForm.password !== userForm.passwordConfirmation) {
+      showSnackbar('A confirmação da senha não confere.', 'error')
       return
     }
 
@@ -426,6 +440,7 @@ export default function AcessoPage() {
         }
 
         setUserDialogOpen(false)
+        setUserForm((current) => ({ ...current, password: '', passwordConfirmation: '' }))
         fetchUsers()
       } else {
         showSnackbar(json.error || 'Erro ao salvar usuário', 'error')
@@ -981,9 +996,44 @@ export default function AcessoPage() {
           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1.5, pb: 0 }}>
             <TextField fullWidth size="small" label="Nome Completo *" placeholder="Ex: João da Silva" value={userForm.nome} onChange={(e) => setUserForm({ ...userForm, nome: e.target.value })} sx={{ mt: 1 }} />
             <TextField fullWidth size="small" label="E-mail Corporativo *" type="email" placeholder="usuario@empresa.com.br" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
-            {!editingUserId && (
-              <TextField fullWidth size="small" label="Senha Inicial *" type="password" placeholder="••••••••" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} />
-            )}
+            <TextField
+              fullWidth
+              size="small"
+              label={editingUserId ? 'Nova senha (opcional)' : 'Senha inicial *'}
+              type={showUserPassword ? 'text' : 'password'}
+              placeholder="Mínimo de 6 caracteres"
+              value={userForm.password}
+              onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+              autoComplete="new-password"
+              helperText={editingUserId ? 'Deixe em branco para manter a senha atual.' : 'A senha será armazenada somente no Supabase Auth.'}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label={showUserPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      onClick={() => setShowUserPassword((visible) => !visible)}
+                      edge="end"
+                      size="small"
+                    >
+                      {showUserPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label={editingUserId ? 'Confirmar nova senha' : 'Confirmar senha *'}
+              type={showUserPassword ? 'text' : 'password'}
+              placeholder="Digite a senha novamente"
+              value={userForm.passwordConfirmation}
+              onChange={(e) => setUserForm({ ...userForm, passwordConfirmation: e.target.value })}
+              autoComplete="new-password"
+              disabled={!userForm.password}
+              error={Boolean(userForm.passwordConfirmation && userForm.password !== userForm.passwordConfirmation)}
+              helperText={userForm.passwordConfirmation && userForm.password !== userForm.passwordConfirmation ? 'As senhas não conferem.' : ' '}
+            />
             <FormControl fullWidth size="small">
               <InputLabel id="dialog-role-label">Perfil de Acesso</InputLabel>
               <Select labelId="dialog-role-label" label="Perfil de Acesso" value={userForm.perfil} onChange={(e) => {

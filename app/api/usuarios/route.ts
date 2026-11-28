@@ -39,6 +39,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    if (typeof password !== 'string' || password.length < 6) {
+      return NextResponse.json(
+        { success: false, error: 'A senha deve ter pelo menos 6 caracteres.' },
+        { status: 400 }
+      )
+    }
 
     // 1. Criar usuário no Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -90,8 +96,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: userData[0] })
   } catch (error: any) {
+    console.error('Erro ao criar usuário no Supabase Auth:', error)
     return NextResponse.json(
-      { success: false, error: error?.message || 'Erro ao criar usuário' },
+      { success: false, error: error?.message || 'Erro ao criar usuário no Supabase Auth' },
       { status: 500 }
     )
   }
@@ -100,7 +107,26 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, permissoes, ...updateData } = body
+    const { id, permissoes, password, ...updateData } = body
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'ID do usuário é obrigatório.' },
+        { status: 400 }
+      )
+    }
+
+    if (password !== undefined && password !== '') {
+      if (typeof password !== 'string' || password.length < 6) {
+        return NextResponse.json(
+          { success: false, error: 'A nova senha deve ter pelo menos 6 caracteres.' },
+          { status: 400 }
+        )
+      }
+
+      const { error: passwordError } = await supabase.auth.admin.updateUserById(id, { password })
+      if (passwordError) throw passwordError
+    }
 
     // Se está atualizando empresa_id, garantir que é número
     if (updateData.empresa_id !== undefined) {
@@ -137,8 +163,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: data[0] })
   } catch (error: any) {
+    console.error('Erro ao atualizar usuário:', error)
     return NextResponse.json(
-      { success: false, error: error?.message || 'Erro ao atualizar' },
+      { success: false, error: error?.message || 'Erro ao atualizar usuário' },
       { status: 500 }
     )
   }
