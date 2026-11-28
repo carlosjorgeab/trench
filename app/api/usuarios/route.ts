@@ -11,18 +11,47 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    const empresa_id = searchParams.get('empresa_id')
+    const empresaId = searchParams.get('empresa_id')
 
     let query = supabase
       .from('usuarios')
       .select('*, empresas(nome)')
 
     if (id) query = (query as any).eq('id', id)
-    if (empresa_id) query = (query as any).eq('empresa_id', empresa_id)
+    if (empresaId) query = (query as any).eq('empresa_id', empresaId)
 
-    const { data, error } = await (query as any).order('created_at', { ascending: false })
+    const { data: users, error } = await (query as any).order('created_at', { ascending: false })
     if (error) throw error
-    return NextResponse.json({ success: true, data })
+
+    const normalizedUsers = await Promise.all((users || []).map(async (user: any) => {
+      const { data: links } = await supabase
+        .from('usuario_empresas')
+        .select('empresa_id, principal, ativo')
+        .eq('usuario_id', user.id)
+        .eq('ativo', true)
+
+      const companyIds = (links || []).map((link) => link.empresa_id)
+      let companies: Array<{ id: number; nome: string; principal: boolean }> = []
+
+      if (companyIds.length) {
+        const { data: linkedCompanies } = await supabase
+          .from('empresas')
+          .select('id, nome, ativo')
+          .in('id', companyIds)
+          .eq('ativo', true)
+
+        companies = (linkedCompanies || []).map((company) => {
+          const link = (links || []).find((item) => item.empresa_id === company.id)
+          return { id: company.id, nome: company.nome, principal: link?.principal === true }
+        })
+      } else if (user.empresa_id) {
+        companies = [{ id: user.empresa_id, nome: user.empresas?.nome || 'Empresa', principal: true }]
+      }
+
+      return { ...user, empresas_vinculadas: companies }
+    }))
+
+    return NextResponse.json({ success: true, data: normalizedUsers })
   } catch {
     return NextResponse.json({ success: false, error: 'Erro ao buscar usuários' }, { status: 500 })
   }
@@ -31,14 +60,25 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password, nome, empresa_id, perfil, ativo = true, permissoes } = body
+    const {
+      email,
+      password,
+      nome,
+      empresa_id,
+      empresa_ids,
+      empresa_principal_id,
+      perfil,
+      ativo = true,
+      permissoes,
+    } = body
 
-    if (!email || !password || !nome || !empresa_id) {
+    if (!email || !password || !nome) {
       return NextResponse.json(
-        { success: false, error: 'Campos obrigatórios: email, password, nome, empresa_id' },
+        { success: false, error: 'Campos obrigatórios: email, password e nome.' },
         { status: 400 }
       )
     }
+
     if (typeof password !== 'string' || password.length < 6) {
       return NextResponse.json(
         { success: false, error: 'A senha deve ter pelo menos 6 caracteres.' },
@@ -46,37 +86,85 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 1. Criar usuário no Supabase Auth
+    const requestedCompanyIds = Array.isArray(empresa_ids)
+      ? empresa_ids.map((id: unknown) => Number(id)).filter((id: number) => Number.isInteger(id) && id > 0)
+      : [Number(empresa_id)].filter((id: number) => Number.isInteger(id) && id > 0)
+    const uniqueCompanyIds = [...new Set(requestedCompanyIds)]
+
+    if (!uniqueCompanyIds.length) {
+      return NextResponse.json(
+        { success: false, error: 'Selecione pelo menos uma empresa ativa.' },
+        { status: 400 }
+      )
+    }
+
+    const principalCompanyId = Number(empresa_principal_id || empresa_id) || uniqueCompanyIds[0]
+
+    const { data: activeCompanies, error: companiesError } = await supabase
+      .from('empresas')
+      .select('id')
+      .eq('ativo', true)
+      .in('id', uniqueCompanyIds)
+
+    if (companiesError) throw companiesError
+
+    const validCompanyIds = (activeCompanies || []).map((company) => company.id)
+    if (!validCompanyIds.length) {
+      return NextResponse.json(
+        { success: false, error: 'Nenhuma empresa selecionada está ativa.' },
+        { status: 400 }
+      )
+    }
+
+    const legacyPrincipalId = validCompanyIds.includes(principalCompanyId)
+      ? principalCompanyId
+      : validCompanyIds[0]
+
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: { nome }
+      user_metadata: { nome },
     })
 
     if (authError) throw authError
 
     const authUserId = authData.user.id
 
-    // 2. Criar registro na tabela usuarios
     const { data: userData, error: userError } = await supabase
       .from('usuarios')
       .insert([{
         id: authUserId,
-        empresa_id: parseInt(empresa_id),
+        empresa_id: legacyPrincipalId,
         nome,
         email,
-        ativo
+        perfil: perfil || 'usuario',
+        ativo,
       }])
       .select()
 
     if (userError) {
-      // Rollback: delete auth user if profile creation fails
       await supabase.auth.admin.deleteUser(authUserId)
       throw userError
     }
 
-    // 3. Salvar permissões granulares (se fornecidas) ou aplicar defaults por perfil
+    const companyLinks = validCompanyIds.map((companyId) => ({
+      usuario_id: authUserId,
+      empresa_id: companyId,
+      principal: companyId === legacyPrincipalId,
+      ativo: true,
+    }))
+
+    const { error: linksError } = await supabase
+      .from('usuario_empresas')
+      .insert(companyLinks)
+
+    if (linksError) {
+      await supabase.from('usuarios').delete().eq('id', authUserId)
+      await supabase.auth.admin.deleteUser(authUserId)
+      throw linksError
+    }
+
     const modulosPermissoes = permissoes || getDefaultPermissions(perfil || 'usuario')
     const permissoesData = modulosPermissoes.map((modulo: string) => ({
       usuario_id: authUserId,
@@ -85,7 +173,7 @@ export async function POST(request: NextRequest) {
       criar: modulo !== 'acesso' && modulo !== 'configuracao',
       editar: modulo !== 'acesso' && modulo !== 'configuracao',
       deletar: (perfil === 'admin' || perfil === 'admin_sistema') && modulo !== 'acesso' && modulo !== 'configuracao',
-      exportar: modulo !== 'acesso'
+      exportar: modulo !== 'acesso',
     }))
 
     const { error: permError } = await supabase
@@ -107,7 +195,14 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, permissoes, password, ...updateData } = body
+    const {
+      id,
+      permissoes,
+      password,
+      empresa_ids,
+      empresa_principal_id,
+      ...updateData
+    } = body
 
     if (!id) {
       return NextResponse.json(
@@ -126,11 +221,66 @@ export async function PUT(request: NextRequest) {
 
       const { error: passwordError } = await supabase.auth.admin.updateUserById(id, { password })
       if (passwordError) throw passwordError
+
+      const { error: metadataError } = await supabase.auth.admin.updateUserById(id, {
+        user_metadata: { nome: updateData.nome },
+      })
+      if (metadataError) throw metadataError
     }
 
-    // Se está atualizando empresa_id, garantir que é número
     if (updateData.empresa_id !== undefined) {
       updateData.empresa_id = parseInt(updateData.empresa_id)
+    }
+
+    if (Array.isArray(empresa_ids) && empresa_ids.length) {
+      const uniqueCompanyIds = [...new Set(
+        empresa_ids
+          .map((companyId: unknown) => Number(companyId))
+          .filter((companyId: number) => Number.isInteger(companyId) && companyId > 0)
+      )]
+
+      const { data: activeCompanies, error: companiesError } = await supabase
+        .from('empresas')
+        .select('id')
+        .eq('ativo', true)
+        .in('id', uniqueCompanyIds)
+
+      if (companiesError) throw companiesError
+
+      const validCompanyIds = (activeCompanies || []).map((company) => company.id)
+      if (!validCompanyIds.length) {
+        return NextResponse.json(
+          { success: false, error: 'Nenhuma empresa selecionada está ativa.' },
+          { status: 400 }
+        )
+      }
+
+      const principalId = Number(empresa_principal_id || updateData.empresa_id)
+      const legacyPrincipalId = validCompanyIds.includes(principalId)
+        ? principalId
+        : validCompanyIds[0]
+
+      updateData.empresa_id = legacyPrincipalId
+
+      const { error: deleteLinksError } = await supabase
+        .from('usuario_empresas')
+        .delete()
+        .eq('usuario_id', id)
+
+      if (deleteLinksError) throw deleteLinksError
+
+      const companyLinks = validCompanyIds.map((companyId) => ({
+        usuario_id: id,
+        empresa_id: companyId,
+        principal: companyId === legacyPrincipalId,
+        ativo: true,
+      }))
+
+      const { error: linksError } = await supabase
+        .from('usuario_empresas')
+        .insert(companyLinks)
+
+      if (linksError) throw linksError
     }
 
     const { data, error } = await supabase
@@ -141,12 +291,9 @@ export async function PUT(request: NextRequest) {
 
     if (error) throw error
 
-    // Salvar/atualizar permissões granulares se fornecidas
     if (permissoes && Array.isArray(permissoes)) {
-      // Remover permissões existentes do usuário
       await supabase.from('permissoes').delete().eq('usuario_id', id)
 
-      // Inserir novas permissões
       if (permissoes.length > 0) {
         const permissoesData = permissoes.map((p: any) => ({
           usuario_id: id,
@@ -157,7 +304,12 @@ export async function PUT(request: NextRequest) {
           deletar: p.deletar ?? false,
           exportar: p.exportar ?? false,
         }))
-        await supabase.from('permissoes').insert(permissoesData)
+
+        const { error: permissionError } = await supabase
+          .from('permissoes')
+          .insert(permissoesData)
+
+        if (permissionError) throw permissionError
       }
     }
 

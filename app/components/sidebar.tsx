@@ -24,6 +24,10 @@ import {
   Tooltip,
   useTheme,
   alpha,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material'
 import {
   LayoutDashboard,
@@ -78,7 +82,7 @@ export function Sidebar({ mobileOpen: externalMobileOpen, onMobileClose }: Sideb
   const pathname = usePathname()
   const router = useRouter()
   const { supabase, refreshUser, user } = useSupabase()
-  const { appUser } = useAppUser()
+  const { appUser, switchCompany } = useAppUser()
   const { config, setMode } = useThemeConfig()
   const theme = useTheme()
 
@@ -345,6 +349,29 @@ export function Sidebar({ mobileOpen: externalMobileOpen, onMobileClose }: Sideb
             {appUser?.empresa_tipo || '---'}
           </Typography>
         </Box>
+
+        {/* Dropdown para seleção de empresa ativa (quando múltiplas empresas estão disponíveis) */}
+        {(appUser?.empresas?.length || 0) > 1 && (
+          <FormControl fullWidth size="small" sx={{ mt: 0.75 }}>
+            <InputLabel id="active-company-label">Empresa ativa</InputLabel>
+            <Select
+              labelId="active-company-label"
+              label="Empresa ativa"
+              value={appUser?.empresa_id?.toString() || ''}
+              onChange={async (event) => {
+                if (!appUser?.id) return
+                await switchCompany(appUser.id, Number(event.target.value))
+                router.refresh()
+              }}
+            >
+              {appUser?.empresas?.map((company) => (
+                <MenuItem key={company.id} value={company.id.toString()}>
+                  {company.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
       </Box>
 
       {/* Main Navigation List */}

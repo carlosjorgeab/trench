@@ -3,6 +3,13 @@
 import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
+export interface AppCompany {
+  id: number
+  nome: string
+  tipo: string | null
+  principal: boolean
+}
+
 export interface AppUser {
   id: string
   auth_id: string
@@ -12,6 +19,7 @@ export interface AppUser {
   empresa_id: number | null
   empresa_nome: string | null
   empresa_tipo: string | null
+  empresas?: AppCompany[]
   ativo: boolean
   isSystemAdmin?: boolean
 }
@@ -20,6 +28,7 @@ interface UserContextType {
   appUser: AppUser | null
   loadingAppUser: boolean
   refreshAppUser: (authId: string) => Promise<AppUser | null>
+  switchCompany: (authId: string, companyId: number) => Promise<AppUser | null>
   clearAppUser: () => void
 }
 
@@ -60,6 +69,25 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const switchCompany = useCallback(async (authId: string, companyId: number): Promise<AppUser | null> => {
+    if (!authId || !companyId) return null
+    setLoadingAppUser(true)
+    try {
+      const res = await fetch('/api/usuarios/empresa-ativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario_id: authId, empresa_id: companyId }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) return null
+      return await refreshAppUser(authId)
+    } catch {
+      return null
+    } finally {
+      setLoadingAppUser(false)
+    }
+  }, [refreshAppUser])
+
   // Auto-refresh appUser when Supabase auth state changes
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -84,7 +112,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const clearAppUser = useCallback(() => setAppUser(null), [])
 
   return (
-    <UserContext.Provider value={{ appUser, loadingAppUser, refreshAppUser, clearAppUser }}>
+    <UserContext.Provider value={{ appUser, loadingAppUser, refreshAppUser, switchCompany, clearAppUser }}>
       {children}
     </UserContext.Provider>
   )

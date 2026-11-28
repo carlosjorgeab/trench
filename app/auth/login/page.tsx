@@ -41,6 +41,11 @@ function LoginContent() {
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false)
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false)
 
+  // Company selection state
+  const [companySelectionOpen, setCompanySelectionOpen] = useState(false)
+  const [availableCompanies, setAvailableCompanies] = useState<Array<{ id: number; nome: string; tipo: string | null; principal: boolean }>>([])
+  const [selectedCompanyId, setSelectedCompanyId] = useState('')
+
   // Definir cookie de expiração de sessão baseado na configuração
   const setSessionExpiryCookie = () => {
     const timeoutMinutes = config.sessionTimeoutMinutes || 60
@@ -246,6 +251,16 @@ function LoginContent() {
         }
       }
 
+      // Se usuário tem mais de uma empresa ativa, solicitar seleção de empresa
+      const companies = appUser.empresas || []
+      if (companies.length > 1) {
+        setAvailableCompanies(companies)
+        setSelectedCompanyId(appUser.empresa_id?.toString() || companies.find((company) => company.principal)?.id.toString() || companies[0].id.toString())
+        setCompanySelectionOpen(true)
+        setLoading(false)
+        return
+      }
+
       await refreshUser()
       setSessionExpiryCookie()
       router.push('/dashboard')
@@ -344,6 +359,65 @@ function LoginContent() {
       if (error) throw error
     } catch (err: any) {
       setErrorMessage(err.message || 'Erro ao conectar via Google OAuth.')
+      setLoading(false)
+    }
+  }
+
+  // Seleção de empresa ativa
+  const handleCompanySelect = async (companyId: number) => {
+    setLoading(true)
+    setErrorMessage('')
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Usuário não autenticado.')
+
+      const response = await fetch('/api/usuarios/empresa-ativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario_id: user.id, empresa_id: companyId }),
+      })
+      const json = await response.json()
+      if (!response.ok || !json.success) {
+        throw new Error(json.error || 'Erro ao selecionar empresa.')
+      }
+
+      await refreshAppUser(user.id)
+      setSessionExpiryCookie()
+      router.push('/dashboard')
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Erro ao selecionar empresa. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleConfirmCompany = async () => {
+    if (!selectedCompanyId) return
+    setLoading(true)
+    setErrorMessage('')
+
+    try {
+      const response = await supabase.auth.getUser()
+      const authUser = response.data.user
+      if (!authUser) throw new Error('Usuário não autenticado.')
+
+      const res = await fetch('/api/usuarios/empresa-ativa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario_id: authUser.id, empresa_id: Number(selectedCompanyId) }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error || 'Não foi possível selecionar a empresa.')
+
+      await refreshAppUser(authUser.id)
+      await refreshUser()
+      setSessionExpiryCookie()
+      setCompanySelectionOpen(false)
+      router.push('/dashboard')
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Erro ao selecionar empresa.')
+    } finally {
       setLoading(false)
     }
   }
@@ -754,6 +828,49 @@ function LoginContent() {
                  </Button>
                </>
              )}
+           </DialogActions>
+         </Dialog>
+
+         {/* Company Selection Dialog */}
+         <Dialog
+           open={companySelectionOpen}
+           onClose={() => {}}
+           disableEscapeKeyDown
+           maxWidth="xs"
+           fullWidth
+           PaperProps={{ sx: { borderRadius: `${config.borderRadius}px` } }}
+         >
+           <DialogTitle sx={{ fontWeight: 700 }}>Selecionar Empresa</DialogTitle>
+           <DialogContent sx={{ pt: 1 }}>
+             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+               Este usuário possui acesso a mais de uma empresa. Escolha a empresa que será utilizada nesta sessão.
+             </Typography>
+             <FormControl fullWidth size="small">
+               <InputLabel id="login-company-select">Empresa</InputLabel>
+               <Select
+                 labelId="login-company-select"
+                 label="Empresa"
+                 value={selectedCompanyId}
+                 onChange={(event) => setSelectedCompanyId(String(event.target.value))}
+               >
+                 {availableCompanies.map((company) => (
+                   <MenuItem key={company.id} value={company.id.toString()}>
+                     {company.nome}{company.principal ? ' — Principal' : ''}
+                   </MenuItem>
+                 ))}
+               </Select>
+             </FormControl>
+           </DialogContent>
+           <DialogActions sx={{ p: 2 }}>
+             <Button
+               variant="contained"
+               fullWidth
+               onClick={handleConfirmCompany}
+               disabled={loading || !selectedCompanyId}
+               startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <Building2 size={16} />}
+             >
+               Entrar na Empresa
+             </Button>
            </DialogActions>
          </Dialog>
        </Card>

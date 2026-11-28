@@ -67,6 +67,13 @@ import {
   EyeOff,
 } from 'lucide-react'
 import { useThemeConfig } from '../lib/theme-config-context'
+import ListItemText from '@mui/material/ListItemText'
+
+interface LinkedCompany {
+  id: number
+  nome: string
+  principal: boolean
+}
 
 interface UserItem {
   id: string
@@ -75,6 +82,7 @@ interface UserItem {
   perfil: string
   empresa_id: number | null
   empresa_nome: string | null
+  empresas_vinculadas: LinkedCompany[]
   ativo: boolean
   created_at: string
 }
@@ -238,6 +246,8 @@ export default function AcessoPage() {
     passwordConfirmation: '',
     perfil: 'usuario',
     empresa_id: '',
+    empresa_ids: [] as string[],
+    empresa_principal_id: '',
     ativo: true,
   })
   const [showUserPassword, setShowUserPassword] = useState(false)
@@ -263,7 +273,8 @@ export default function AcessoPage() {
           email: u.email,
           perfil: u.perfil || 'usuario',
           empresa_id: u.empresa_id,
-          empresa_nome: u.empresas?.nome || null,
+          empresa_nome: u.empresa_nome || u.empresas?.nome || null,
+          empresas_vinculadas: u.empresas_vinculadas || [],
           ativo: u.ativo,
           created_at: u.created_at,
         })))
@@ -320,13 +331,17 @@ export default function AcessoPage() {
   const handleOpenUserDialog = async (userToEdit?: UserItem) => {
     if (userToEdit) {
       setEditingUserId(userToEdit.id)
+      const linkedIds = (userToEdit.empresas_vinculadas || []).map((company) => company.id.toString())
+      const principalCompany = (userToEdit.empresas_vinculadas || []).find((company) => company.principal)
       setUserForm({
         nome: userToEdit.nome,
         email: userToEdit.email,
         password: '',
         passwordConfirmation: '',
         perfil: userToEdit.perfil,
-        empresa_id: userToEdit.empresa_id?.toString() || '',
+        empresa_id: userToEdit.empresa_id?.toString() || principalCompany?.id.toString() || '',
+        empresa_ids: linkedIds.length ? linkedIds : (userToEdit.empresa_id ? [userToEdit.empresa_id.toString()] : []),
+        empresa_principal_id: principalCompany?.id.toString() || userToEdit.empresa_id?.toString() || '',
         ativo: userToEdit.ativo,
       })
 
@@ -369,6 +384,8 @@ export default function AcessoPage() {
         passwordConfirmation: '',
         perfil: 'usuario',
         empresa_id: companies[0]?.id?.toString() || '',
+        empresa_ids: companies[0] ? [companies[0].id.toString()] : [],
+        empresa_principal_id: companies[0]?.id?.toString() || '',
         ativo: true,
       })
       // Inicializar com presets de "Usuário Padrão"
@@ -378,8 +395,16 @@ export default function AcessoPage() {
   }
 
   const handleSaveUser = async () => {
-    if (!userForm.nome || !userForm.email || !userForm.empresa_id) {
-      showSnackbar('Preencha os campos obrigatórios (Nome, E-mail, Empresa).', 'error')
+    if (!userForm.nome || !userForm.email) {
+      showSnackbar('Preencha os campos obrigatórios (Nome e E-mail).', 'error')
+      return
+    }
+    if (!userForm.empresa_ids.length) {
+      showSnackbar('Selecione pelo menos uma empresa para o usuário.', 'error')
+      return
+    }
+    if (!userForm.empresa_principal_id || !userForm.empresa_ids.includes(userForm.empresa_principal_id)) {
+      showSnackbar('Selecione uma empresa principal entre as empresas vinculadas.', 'error')
       return
     }
     if (!editingUserId && !userForm.password) {
@@ -400,7 +425,9 @@ export default function AcessoPage() {
       const body = {
         nome: userForm.nome,
         email: userForm.email,
-        empresa_id: parseInt(userForm.empresa_id),
+        empresa_id: parseInt(userForm.empresa_principal_id || userForm.empresa_id),
+        empresa_ids: userForm.empresa_ids.map((companyId) => parseInt(companyId)),
+        empresa_principal_id: parseInt(userForm.empresa_principal_id || userForm.empresa_id),
         perfil: userForm.perfil,
         ativo: userForm.ativo,
         ...(userForm.password && { password: userForm.password }),
@@ -1062,11 +1089,22 @@ export default function AcessoPage() {
               <Button size="small" variant="outlined" onClick={() => applyDialogPermissionPreset('clear')}>Limpar</Button>
             </Box>
             <FormControl fullWidth size="small">
-              <InputLabel id="dialog-company-label">Empresa *</InputLabel>
-              <Select labelId="dialog-company-label" label="Empresa" value={userForm.empresa_id} onChange={(e) => setUserForm({ ...userForm, empresa_id: e.target.value })}>
-                {companies.map((c) => (
-                  <MenuItem key={c.id} value={c.id.toString()}>{c.nome}</MenuItem>
-                ))}
+              <InputLabel id="dialog-main-company-label">Empresa Principal *</InputLabel>
+              <Select
+                labelId="dialog-main-company-label"
+                label="Empresa Principal *"
+                value={userForm.empresa_principal_id}
+                onChange={(event) => setUserForm((current) => ({
+                  ...current,
+                  empresa_principal_id: event.target.value,
+                  empresa_id: event.target.value,
+                }))}
+              >
+                {companies
+                  .filter((company) => userForm.empresa_ids.includes(company.id.toString()))
+                  .map((company) => (
+                    <MenuItem key={company.id} value={company.id.toString()}>{company.nome}</MenuItem>
+                  ))}
               </Select>
             </FormControl>
             <FormControlLabel control={<Switch checked={userForm.ativo} onChange={(e) => setUserForm({ ...userForm, ativo: e.target.checked })} color="success" />} label="Usuário Ativo (Pode realizar login)" />
